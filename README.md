@@ -79,7 +79,7 @@ Option commune à toutes les cartes, `theme` (« Couleurs de la carte » dans l'
 
 ### Manuellement
 
-1. Téléchargez [`iss-cards.js`](https://raw.githubusercontent.com/Marlboro62/ISS/main/iss-cards.js) (clic droit → Enregistrer sous) et copiez-le dans `/config/www/`.
+1. Téléchargez [`iss-cards.js`](https://raw.githubusercontent.com/Marlboro62/ISS/main/dist/iss-cards.js) et [`iss-cards-maps.js`](https://raw.githubusercontent.com/Marlboro62/ISS/main/dist/iss-cards-maps.js) (clic droit → Enregistrer sous) et copiez-les **tous les deux** dans `/config/www/` : le second contient MapLibre GL, chargé par la mini-carte.
 2. **Paramètres → Tableaux de bord → ⋮ → Ressources → Ajouter une ressource** : URL `/local/iss-cards.js`, type **Module JavaScript**.
 3. Rechargez la page (Ctrl+F5).
 
@@ -111,7 +111,7 @@ type: custom:glossy-iss-tracker-card
 ```
 
 - Position de l'ISS (latitude et longitude) dans le bandeau, **en vert** quand le capteur répond, **en rouge clignotant** quand le signal est perdu.
-- **Mini-carte** centrée sur l'ISS, avec **les fonds de la carte de Home Assistant** (CARTO, sans clé), sombres ou clairs selon le thème. Une clé gratuite [Stadia Maps](https://client.stadiamaps.com/) ou [CARTO](https://carto.com/basemaps/apikey) est facultative : elle donne leurs propres fonds. La clé reste dans la configuration de votre tableau de bord.
+- **Mini-carte** centrée sur l'ISS, **sans clé** : fond vectoriel [OpenFreeMap](https://openfreemap.org/) (gratuit, sans clé), sombre ou clair selon le thème, affiché avec MapLibre GL livré avec les cartes (aucun CDN). Une clé gratuite [Stadia Maps](https://client.stadiamaps.com/) ou [CARTO](https://carto.com/basemaps/apikey) reste possible pour leurs propres fonds. Les fonds CARTO sans clé, ceux de la carte de Home Assistant, ne sont plus utilisés : ils portent désormais un filigrane « API KEY REQUIRED » ([home-assistant/frontend#53800](https://github.com/home-assistant/frontend/issues/53800)).
 
 | Option | Rôle | Défaut |
 | --- | --- | --- |

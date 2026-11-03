@@ -17,7 +17,7 @@
   Couleurs : <select id="theme"><option value="v2">bleu nuit</option><option value="auto">clair</option><option value="ha">Home Assistant</option></select></p>
 <div class="grid" id="grid"></div>
 <script type="module">
-await import("../iss-cards.js");
+await import("../dist/iss-cards.js");
 const H = 3600e3, now = Date.now();
 const iso = (ms) => new Date(ms).toISOString();
 const fr = (ms) => new Date(ms).toLocaleDateString("fr-FR") + " à " + new Date(ms).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
