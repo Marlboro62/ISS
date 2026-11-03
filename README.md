@@ -32,8 +32,8 @@
 
 | Type | Carte |
 | --- | --- |
-| `custom:glossy-space-dashboard-card` | **Space Operations** : les quatre cartes ci-dessous réunies en un seul tableau de bord, avec une seule configuration |
-| `custom:glossy-iss-tracker-card` | **ISS Tracker** : position de l'ISS en direct, latitude et longitude, sur une mini-carte sombre |
+| `custom:glossy-space-dashboard-card` | **Opérations spatiales** : les quatre cartes ci-dessous réunies en un seul tableau de bord, avec une seule configuration |
+| `custom:glossy-iss-tracker-card` | **Suivi de l’ISS** : position de l'ISS en direct, latitude et longitude, sur une mini-carte sombre |
 | `custom:glossy-iss-passes-card` | **Passages ISS** : prochain passage visible et prochain passage global (début, durée, élévation, trajet), graphique de la distance |
 | `custom:glossy-iss-transit-card` | **Transits ISS** : prochains passages de l'ISS devant le Soleil et la Lune, avec compte à rebours |
 | `custom:glossy-launch-card` | **Prochain lancement** : agence, mission, date (rouge clignotant juste avant le décollage), pas de tir, météo, lanceur, orbite, statut |
@@ -68,7 +68,7 @@ Option commune à toutes les cartes, `theme` (« Couleurs de la carte » dans l'
 | `auto` | Bleu nuit, ou version claire quand Home Assistant est en mode clair |
 | `ha` | Couleurs du thème Home Assistant (clair ou sombre) |
 
-![Space Operations](https://raw.githubusercontent.com/Marlboro62/ISS/main/images/tableau-de-bord.png)
+![Opérations spatiales](https://raw.githubusercontent.com/Marlboro62/ISS/main/images/tableau-de-bord.png)
 
 ## Installation
 
@@ -86,13 +86,13 @@ Option commune à toutes les cartes, `theme` (« Couleurs de la carte » dans l'
 
 > Vous aviez les fichiers séparés (`glossy-iss-tracker-card.js`, `glossy-space-dashboard-card.js`…) ? Les types de carte n'ont pas changé : supprimez simplement les anciennes ressources et gardez celle-ci. Vos tableaux de bord restent tels quels.
 
-## Space Operations — `custom:glossy-space-dashboard-card`
+## Opérations spatiales — `custom:glossy-space-dashboard-card`
 
-Les quatre cartes en un seul tableau de bord : bandeau de titre, ISS Tracker (avec le statut du signal et le niveau de zoom), passages, prochain lancement et transits. Sur deux colonnes quand la carte est large, sur une seule quand elle est étroite (colonne d'un tableau de bord, téléphone).
+Les quatre cartes en un seul tableau de bord : bandeau de titre, suivi de l’ISS (avec l’état du signal et le niveau de zoom), passages, prochain lancement et transits. Sur deux colonnes quand la carte est large, sur une seule quand elle est étroite (colonne d'un tableau de bord, téléphone).
 
 ```yaml
 type: custom:glossy-space-dashboard-card
-title: SPACE OPERATIONS
+title: OPÉRATIONS SPATIALES
 tracker:
   zoom_span: 40
 passes:
@@ -105,7 +105,7 @@ Sans entité, chaque section est remplie par le calcul intégré ou par Launch L
 
 Les sections `tracker`, `passes`, `launch` et `transits` prennent les mêmes options que les cartes séparées, décrites ci-dessous. `title` change le titre du bandeau, `theme` les couleurs de tout le tableau de bord.
 
-## ISS Tracker — `custom:glossy-iss-tracker-card`
+## Suivi de l’ISS — `custom:glossy-iss-tracker-card`
 
 ```yaml
 type: custom:glossy-iss-tracker-card
