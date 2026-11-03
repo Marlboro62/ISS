@@ -161,19 +161,19 @@ Dès qu'un capteur est renseigné, la carte n'affiche que les sections dont le c
 
 ```yaml
 type: custom:glossy-iss-transit-card
-solar_entity: sensor.iss_next_solar_transit
-lunar_entity: sensor.iss_next_lunar_transit
 ```
 
 - Date du prochain **transit solaire** et **lunaire**, compte à rebours, durée, élévation, et distance de l'ISS pour la Lune.
 - Sans transit prévu, l'approche la plus proche.
 - **Sans entité**, les transits sont calculés par la carte sur les 14 prochains jours (voir [Calcul intégré de l'ISS](#calcul-intégré-de-liss)).
 
+Avec vos propres capteurs :
+
 ```yaml
 type: custom:glossy-iss-transit-card
+solar_entity: sensor.iss_next_solar_transit
+lunar_entity: sensor.iss_next_lunar_transit
 ```
-
-Avec vos propres capteurs :
 
 | Option | Rôle | Défaut |
 | --- | --- | --- |
@@ -186,6 +186,14 @@ Avec vos propres capteurs :
 
 ![Prochain lancement](https://raw.githubusercontent.com/Marlboro62/ISS/main/images/lancement.png)
 
+**Sans entité**, la carte lit le prochain lancement sur Launch Library 2 :
+
+```yaml
+type: custom:glossy-launch-card
+```
+
+Avec les capteurs de l'intégration HACS **Next Launch** :
+
 ```yaml
 type: custom:glossy-launch-card
 entity: sensor.next_launch_prochain_lancement
@@ -194,14 +202,6 @@ date_entity: sensor.next_launch_date_de_lancement
 probability_entity: sensor.next_launch_probabilite_de_lancement
 status_entity: sensor.next_launch_statut_de_lancement
 ```
-
-**Sans entité**, la carte lit le prochain lancement sur Launch Library 2 :
-
-```yaml
-type: custom:glossy-launch-card
-```
-
-Elle lit aussi les capteurs de l'intégration HACS **Next Launch**, quand ils sont renseignés (exemple ci-dessus).
 
 | Option | Rôle | Défaut |
 | --- | --- | --- |
