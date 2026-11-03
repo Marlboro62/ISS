@@ -10,7 +10,7 @@
  *   custom:glossy-space-dashboard-card  les quatre en un seul tableau de bord
  */
 
-const CARD_VERSION = "0.7.0-beta.4";
+const CARD_VERSION = "0.8.0-beta.1";
 
 // Enregistrement sans erreur si une ancienne copie de la carte est encore
 // chargée comme ressource à côté de celle de HACS.
@@ -500,6 +500,74 @@ const _issLaunch = (() => {
   };
   const VCFG = { entity: 'iss.launch.main', mission_entity: 'iss.launch.mission', date_entity: 'iss.launch.date', probability_entity: 'iss.launch.proba', status_entity: 'iss.launch.status' };
   return { load, states, VCFG, onLoad: (f) => { listeners.add(f); return () => listeners.delete(f); }, get failed() { return !data && !!failedAt; } };
+})();
+
+// ── Traduction en français des textes de lancement (Launch Library 2 ou Next Launch, en anglais) ──
+// Statuts et orbites : dictionnaire. Description : traducteur intégré du navigateur (Chrome, sur
+// l'appareil, sans clé), sinon le service gratuit MyMemory ; texte anglais en attendant, traductions gardées.
+const _issFr = (() => {
+  const STATUS = {
+    'go for launch': 'Lancement confirmé (Go)', 'go': 'Lancement confirmé (Go)', 'to be confirmed': 'À confirmer', 'tbc': 'À confirmer',
+    'to be determined': 'À déterminer', 'tbd': 'À déterminer', 'launch successful': 'Lancement réussi', 'success': 'Lancement réussi',
+    'launch failure': 'Échec du lancement', 'failure': 'Échec du lancement', 'launch was a partial failure': 'Échec partiel', 'partial failure': 'Échec partiel',
+    'on hold': 'En attente', 'hold': 'En attente', 'launch in flight': 'En vol', 'in flight': 'En vol', 'payload deployed': 'Charge utile déployée',
+  };
+  const ORBIT = {
+    'low earth orbit': 'Orbite basse (LEO)', 'very low earth orbit': 'Orbite très basse (VLEO)', 'medium earth orbit': 'Orbite moyenne (MEO)',
+    'geostationary orbit': 'Orbite géostationnaire (GEO)', 'geosynchronous orbit': 'Orbite géosynchrone', 'geostationary transfer orbit': 'Orbite de transfert géostationnaire (GTO)',
+    'geosynchronous transfer orbit': 'Orbite de transfert géosynchrone (GTO)', 'sun-synchronous orbit': 'Orbite héliosynchrone (SSO)', 'polar orbit': 'Orbite polaire',
+    'suborbital': 'Suborbital', 'sub-orbital': 'Suborbital', 'elliptical orbit': 'Orbite elliptique', 'highly elliptical orbit': 'Orbite très elliptique (HEO)',
+    'lunar orbit': 'Orbite lunaire', 'lunar flyby': 'Survol de la Lune', 'lunar surface': 'Surface de la Lune', 'heliocentric n/a': 'Orbite héliocentrique',
+    'heliocentric': 'Orbite héliocentrique', 'mars orbit': 'Orbite martienne', 'mars flyby': 'Survol de Mars', 'low earth orbit (iss)': 'Orbite basse (ISS)',
+    'retrograde orbit': 'Orbite rétrograde', 'direct-gto': 'Transfert géostationnaire direct', 'earth-moon l2': 'Point de Lagrange Terre-Lune L2', 'sun-earth l1': 'Point de Lagrange Soleil-Terre L1',
+    'sun-earth l2': 'Point de Lagrange Soleil-Terre L2',
+  };
+  const key = (t) => String(t || '').trim().toLowerCase();
+  const KEY = 'iss-cards-fr';
+  let memo = {};
+  try { memo = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (e) { memo = {}; }
+  const save = () => { try { const k = Object.keys(memo); if (k.length > 40) k.slice(0, k.length - 40).forEach((x) => delete memo[x]); localStorage.setItem(KEY, JSON.stringify(memo)); } catch (e) { /* stockage indisponible */ } };
+  const pending = new Map(), listeners = new Set();
+  let translator = null;
+  // traducteur intégré du navigateur (Chrome) seulement si le modèle français est déjà prêt sur l'appareil
+  const chrome = async () => {
+    if (translator) return translator;
+    const T = self.Translator;
+    if (!T || !T.availability) return null;
+    // certains navigateurs ne répondent jamais : pas plus de 2 secondes d'attente
+    const a = await Promise.race([T.availability({ sourceLanguage: 'en', targetLanguage: 'fr' }), new Promise((r) => setTimeout(() => r('délai'), 2000))]);
+    if (a !== 'available') return null;
+    translator = await T.create({ sourceLanguage: 'en', targetLanguage: 'fr' });
+    return translator;
+  };
+  const myMemory = async (t) => {
+    const r = await fetch(`https://api.mymemory.translated.net/get?langpair=en|fr&q=${encodeURIComponent(t.slice(0, 480))}`);
+    if (!r.ok) throw new Error(`MyMemory ${r.status}`);
+    const j = await r.json(), out = j?.responseData?.translatedText;
+    if (!out || j.responseStatus !== 200 || /MYMEMORY WARNING|QUERY LENGTH/i.test(out)) throw new Error('MyMemory : pas de traduction');
+    return out;
+  };
+  /** Texte libre : traduction si elle est prête, sinon le texte d'origine (la traduction arrive ensuite). */
+  const text = (t) => {
+    const src = String(t || '').trim();
+    if (!src) return '';
+    if (memo[src]) return memo[src];
+    if (!pending.has(src)) {
+      pending.set(src, (async () => {
+        let out = null;
+        try { const tr = await chrome(); if (tr) out = await tr.translate(src); } catch (e) { /* traducteur intégré indisponible */ }
+        if (!out) { try { out = await myMemory(src); } catch (e) { console.warn('[iss-cards] traduction indisponible :', e.message || e); } }
+        if (out) { memo[src] = out; save(); listeners.forEach((f) => f()); }
+      })());
+    }
+    return src;
+  };
+  return {
+    status: (t) => STATUS[key(t)] || t,
+    orbit: (t) => ORBIT[key(t)] || t,
+    text,
+    onChange: (f) => { listeners.add(f); return () => listeners.delete(f); },
+  };
 })();
 
 // Diagnostic dans la console du navigateur (F12) :
@@ -2072,24 +2140,25 @@ class GlossyLaunchCard extends HTMLElement {
     const statsEl = this._q('lc-stats');
     if (statsEl) {
       const missionAttrs = mission?.attributes || {};
-      const orbit = missionAttrs.target_orbit || '—';
+      const orbit = _issFr.orbit(missionAttrs.target_orbit) || '—';
       const rocket = missionAttrs.rocket_name || '—';
       const statusText = status ? status.state : '';
       const probaVal = proba ? proba.state : null;
       const probaDisplay = (!probaVal || probaVal === 'unknown' || probaVal === 'unavailable')
-        ? 'Pas de donnée' : probaVal + '%';
+        ? 'Pas de données' : probaVal + '%';
       const isGo = /go/i.test(statusText);
       let rows = '';
       if (cfg.probability_entity) rows += `<div class="row"><span><b>Météo</b></span><span>${this._esc(probaDisplay)}</span></div>`;
       rows += `<div class="row"><span><b>Lanceur</b></span><span>${this._esc(rocket)}</span></div>`;
       rows += `<div class="row"><span><b>Orbite</b></span><span>${this._esc(orbit)}</span></div>`;
-      if (cfg.status_entity) rows += `<div class="row status ${isGo ? 'go' : 'nogo'}"><span><b>Statut</b></span><span><b>${this._esc(statusText)}</b></span></div>`;
+      if (cfg.status_entity) rows += `<div class="row status ${isGo ? 'go' : 'nogo'}"><span><b>Statut</b></span><span><b>${this._esc(_issFr.status(statusText))}</b></span></div>`;
       statsEl.innerHTML = rows;
     }
 
     // ── Description ──
     const descEl = this._q('lc-desc');
-    if (descEl) descEl.textContent = mission?.attributes?.description || '';
+    if (descEl) descEl.textContent = _issFr.text(mission?.attributes?.description);
+    if (!this._offFr) this._offFr = _issFr.onChange(() => this._update());
   }
 }
 
@@ -2231,7 +2300,7 @@ class GlossySpaceDashboardCard extends HTMLElement{
  _updatePasses(){const c=this._config.passes||{},s=this._h.states;if(this._passLive()){_ISS.load();const msg=_issLive.problem(this._h),m=this._w.querySelector('#live-msg');if(m){m.hidden=!msg;m.textContent=msg||''}const nx=msg?null:_issLive.next(this._h,c.min_elevation!=null?Number(c.min_elevation):10,10,c.min_visible!=null?Number(c.min_visible):120),pv=this._w.querySelector('#pass-visible'),pg=this._w.querySelector('#pass-global');if(pv)pv.innerHTML=msg?'':_issLive.lines(nx&&nx.visible,_gsEsc);if(pg)pg.innerHTML=msg?'':_issLive.lines(nx&&nx.global,_gsEsc);const d=_issLive.distance(this._h),dn=this._w.querySelector('#distance-now');if(dn)dn.textContent=d===null?'—':Math.round(d).toLocaleString('fr-FR');this._history=_issLive.history(this._h,c.distance_hours||12);this._drawHistory();return}const render=(id,readId,attrId)=>{const el=this._w.querySelector('#'+id);if(!el)return;const read=s[readId],a=s[attrId]?.attributes||{};let h=`<p><strong>Début :</strong> ${_gsEsc(read?.state||'—')}</p>`;if(a.duration!=null)h+=`<p><strong>Durée :</strong> ${(parseFloat(a.duration)/60).toFixed(1)} min</p>`;if(a.maxEl!=null)h+=`<p><strong>Élévation max :</strong> ${_gsEsc(a.maxEl)}°</p>`;const path=[a.startAzCompass,a.maxAzCompass,a.endAzCompass].filter(Boolean).join(' → ');if(path)h+=`<p><strong>Trajet :</strong> ${_gsEsc(path)}</p>`;el.innerHTML=h};render('pass-visible',c.visible_readable_entity,c.visible_attrs_entity);render('pass-global',c.global_readable_entity,c.global_attrs_entity);const st=s[c.distance_entity],now=this._w.querySelector('#distance-now');if(now&&st){const n=parseFloat(st.state);now.textContent=Number.isFinite(n)?Math.round(n).toLocaleString('fr-FR'):'—'}if(c.distance_entity)this._loadHistory()}
  async _loadHistory(){const c=this._config.passes||{};if(!this._h?.connection||!c.distance_entity)return;if(Date.now()-this._historyAt<300000&&this._history)return;this._historyAt=Date.now();try{const start=new Date(Date.now()-(c.distance_hours||12)*3600000).toISOString();const r=await this._h.connection.sendMessagePromise({type:'history/history_during_period',start_time:start,entity_ids:[c.distance_entity],minimal_response:true,no_attributes:true});this._history=(r?.[c.distance_entity]||[]).map(x=>parseFloat(x.s??x.state)).filter(Number.isFinite);this._drawHistory()}catch(e){console.warn('[glossy-space-dashboard-card] history unavailable',e)}}
  _drawHistory(){const svg=this._w.querySelector('#distance-graph'),v=this._history;if(!svg||!v||v.length<2)return;const min=Math.min(...v),range=Math.max(...v)-min||1,W=300,H=55,p=v.map((n,i)=>`${(i/(v.length-1)*W).toFixed(1)},${(H-5-((n-min)/range)*(H-10)).toFixed(1)}`).join(' ');svg.innerHTML=`<polygon points="0,${H} ${p} ${W},${H}" style="fill:color-mix(in srgb,var(--g-acc) 15%,transparent)"/><polyline points="${p}" fill="none" stroke-width="2" style="stroke:var(--g-acc)"/>`}
- _updateLaunch(){const live=!(this._config.launch||{}).entity,vs=live?_issLaunch.states():null;if(live)_issLaunch.load();const c=live?{...(this._config.launch||{}),..._issLaunch.VCFG}:this._config.launch||{},s=vs?{...this._h.states,...vs}:this._h.states;if(live&&!vs){const m=this._w.querySelector('#launch-mission');if(m)m.textContent=_issLaunch.failed?'Prochain lancement indisponible (Launch Library 2)':'Chargement du prochain lancement…';return}const main=s[c.entity],mission=s[c.mission_entity],date=s[c.date_entity],proba=s[c.probability_entity],status=s[c.status_entity];const q=id=>this._w.querySelector('#'+id);if(q('launch-provider'))q('launch-provider').textContent=main?.attributes?.provider||'—';if(q('launch-mission'))q('launch-mission').textContent=mission?.state||main?.state||'—';if(q('launch-date'))q('launch-date').textContent=date?.state?_gsDate(date.state):'—';{const m=(new Date(date?.state).getTime()-Date.now())/60000;this._w.querySelector('#launch-panel')?.classList.toggle('imminent',Number.isFinite(m)&&m>0&&m<(c.imminent_minutes??15))}if(q('launch-info')){const a=main?.attributes||{};q('launch-info').innerHTML=a.pad?`📍 <b>${_gsEsc(a.pad)}</b>${a.facility?`<br><small>${_gsEsc(a.facility)}</small>`:''}`:''}if(q('launch-stats')){const a=mission?.attributes||{};q('launch-stats').innerHTML=`<div><b>Météo</b><span>${proba?.state&&!['unknown','unavailable'].includes(proba.state)?_gsEsc(proba.state)+'%':'Pas de donnée'}</span></div><div><b>Lanceur</b><span>${_gsEsc(a.rocket_name||'—')}</span></div><div><b>Orbite</b><span>${_gsEsc(a.target_orbit||'—')}</span></div>${c.status_entity?`<div class="${/go/i.test(status?.state||'')?'good':'warn'}"><b>Statut</b><b>${_gsEsc(status?.state||'—')}</b></div>`:''}`}if(q('launch-desc'))q('launch-desc').textContent=mission?.attributes?.description||''}
+ _updateLaunch(){const live=!(this._config.launch||{}).entity,vs=live?_issLaunch.states():null;if(live)_issLaunch.load();const c=live?{...(this._config.launch||{}),..._issLaunch.VCFG}:this._config.launch||{},s=vs?{...this._h.states,...vs}:this._h.states;if(live&&!vs){const m=this._w.querySelector('#launch-mission');if(m)m.textContent=_issLaunch.failed?'Prochain lancement indisponible (Launch Library 2)':'Chargement du prochain lancement…';return}const main=s[c.entity],mission=s[c.mission_entity],date=s[c.date_entity],proba=s[c.probability_entity],status=s[c.status_entity];const q=id=>this._w.querySelector('#'+id);if(q('launch-provider'))q('launch-provider').textContent=main?.attributes?.provider||'—';if(q('launch-mission'))q('launch-mission').textContent=mission?.state||main?.state||'—';if(q('launch-date'))q('launch-date').textContent=date?.state?_gsDate(date.state):'—';{const m=(new Date(date?.state).getTime()-Date.now())/60000;this._w.querySelector('#launch-panel')?.classList.toggle('imminent',Number.isFinite(m)&&m>0&&m<(c.imminent_minutes??15))}if(q('launch-info')){const a=main?.attributes||{};q('launch-info').innerHTML=a.pad?`📍 <b>${_gsEsc(a.pad)}</b>${a.facility?`<br><small>${_gsEsc(a.facility)}</small>`:''}`:''}if(q('launch-stats')){const a=mission?.attributes||{};q('launch-stats').innerHTML=`<div><b>Météo</b><span>${proba?.state&&!['unknown','unavailable'].includes(proba.state)?_gsEsc(proba.state)+'%':'Pas de données'}</span></div><div><b>Lanceur</b><span>${_gsEsc(a.rocket_name||'—')}</span></div><div><b>Orbite</b><span>${_gsEsc(_issFr.orbit(a.target_orbit)||'—')}</span></div>${c.status_entity?`<div class="${/go/i.test(status?.state||'')?'good':'warn'}"><b>Statut</b><b>${_gsEsc(_issFr.status(status?.state)||'—')}</b></div>`:''}`}if(q('launch-desc'))q('launch-desc').textContent=_issFr.text(mission?.attributes?.description);if(!this._offFr)this._offFr=_issFr.onChange(()=>this._h&&this._updateLaunch())}
  _updateTransits(){const live=this._transLive(),c=live?{solar_entity:'iss.transit.solar',lunar_entity:'iss.transit.lunar'}:this._config.transits||{},vs=live?_issTransit.states(this._h):null,s=vs?{...this._h.states,...vs}:this._h.states,msg=live?_issLive.problem(this._h):null;for(const type of ['solar','lunar']){const body=this._w.querySelector('#transit-body-'+type),st=s[c[type+'_entity']];if(body&&msg){body.innerHTML=`<div class="empty">${_gsEsc(msg)}</div>`;continue}if(!body||!st)continue;const a=st.attributes||{},date=a.date;if(!date){body.innerHTML=`<div class="empty">Aucun transit prévu ${live?'dans les 14 prochains jours':"dans l'année"}.${a.closest_approach_deg!=null?`<br>Approche : <b>${Number(a.closest_approach_deg).toFixed(1)}°</b>`:''}</div>`;continue}body.innerHTML=`<div class="transit-date">${_gsEsc(_gsDate(date))}</div><span class="transit-count">${_gsEsc(_gsCountdown(date))}</span><div class="metrics"><div class="metric"><small>Durée</small><b>${_gsDuration(a.duration_seconds)}</b></div><div class="metric"><small>Élévation</small><b>${a.max_elevation_deg!=null?Number(a.max_elevation_deg).toFixed(1)+'°':'—'}</b></div>${type==='lunar'?`<div class="metric" style="grid-column:1/-1"><small>Distance ISS</small><b>${a.iss_distance_km!=null?Math.round(a.iss_distance_km).toLocaleString('fr-FR')+' km':'—'}</b></div>`:''}</div>`}}
  _startTick(){if(this._tick)return;let n=0;this._tick=setInterval(()=>{if(!this._h)return;if(!(this._config.tracker||{}).entity)this._updateTracker();if(++n%6===0){this._updateLaunch();if(this._passLive())this._updatePasses();if(this._transLive())this._updateTransits()}},5000);const a=_ISS.onLoad(()=>this._h&&this._update()),b=_issLaunch.onLoad(()=>this._h&&this._updateLaunch());this._offLoad=()=>{a();b()}}
  connectedCallback(){if(this._ok&&!this._tick)this._startTick()}

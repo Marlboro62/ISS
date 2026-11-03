@@ -42,6 +42,7 @@
 
 - **ISS** : position, distance, prochains passages et **transits devant le Soleil et la Lune**, calculés par la carte.
 - **Prochain lancement** : lu sur [Launch Library 2](https://thespacedevs.com/llapi) (The Space Devs), gratuit et sans clé, la source de l'intégration Next Launch. Une requête toutes les 30 minutes, partagée par toutes les cartes.
+- **En français** : statut et orbite traduits par la carte ; description traduite par le traducteur intégré du navigateur (Chrome, sur l'appareil) quand le français y est prêt, sinon par le service gratuit [MyMemory](https://mymemory.translated.net/). Les traductions sont gardées dans le navigateur ; les noms propres (agence, mission, lanceur, pas de tir) restent tels quels.
 
 ### Calcul intégré de l'ISS
 
