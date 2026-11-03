@@ -38,7 +38,20 @@
 | `custom:glossy-iss-transit-card` | **Transits ISS** : prochains passages de l'ISS devant le Soleil et la Lune, avec compte à rebours |
 | `custom:glossy-launch-card` | **Prochain lancement** : agence, mission, date (rouge clignotant juste avant le décollage), pas de tir, météo, lanceur, orbite, statut |
 
-Les cartes lisent des **capteurs Home Assistant** : chacune n'affiche que les parties dont le capteur est configuré. Toutes ont un **éditeur visuel**.
+**Rien à installer pour l'ISS** : sans capteur configuré, la position de l'ISS, sa distance et les prochains passages au-dessus de chez vous sont **calculés par la carte**, dans le navigateur. Ni intégration, ni package YAML, ni clé N2YO. Le lancement et les transits lisent des capteurs Home Assistant. Toutes les cartes ont un **éditeur visuel**.
+
+### Calcul intégré de l'ISS
+
+- **Éléments orbitaux** (TLE) de l'ISS téléchargés depuis [CelesTrak](https://celestrak.org/), ou [wheretheiss.at](https://wheretheiss.at/) en secours : gratuits, sans clé, rafraîchis toutes les 6 heures et gardés dans le navigateur. Une seule requête pour toutes les cartes.
+- **Position** calculée toutes les 5 secondes avec le modèle SGP4, celui de N2YO et de CelesTrak.
+- **Passages** des 10 prochains jours depuis le **lieu de Home Assistant** (Paramètres › Système › Général) :
+  - le **prochain passage visible à l'œil nu** : ISS éclairée par le Soleil, ciel noir chez vous (Soleil à plus de 6° sous l'horizon) ;
+  - le **prochain passage global** : au-dessus de la hauteur minimale, de jour comme de nuit.
+- **Distance** au sol entre chez vous et le point sous l'ISS, avec la courbe des dernières heures.
+
+Votre position reste dans votre navigateur : elle n'est envoyée à aucun service.
+
+Vous avez déjà des capteurs (par exemple un package N2YO) ? Renseignez-les dans la carte : elle les lit à la place du calcul intégré.
 
 Option commune à toutes les cartes, `theme` (« Couleurs de la carte » dans l'éditeur) :
 
@@ -74,14 +87,9 @@ Les quatre cartes en un seul tableau de bord : bandeau de titre, ISS Tracker (av
 type: custom:glossy-space-dashboard-card
 title: SPACE OPERATIONS
 tracker:
-  entity: sensor.iss
   carto_api_key: VOTRE_CLE
 passes:
-  visible_readable_entity: sensor.iss_prochain_passage_visible_lisible
-  visible_attrs_entity: sensor.iss_prochain_passage_visible
-  global_readable_entity: sensor.iss_prochain_passage_global_lisible
-  global_attrs_entity: sensor.iss_prochain_passage_global
-  distance_entity: sensor.distance_iss
+  min_elevation: 10
 launch:
   entity: sensor.next_launch_prochain_lancement
   mission_entity: sensor.next_launch_mission_de_lancement
@@ -99,7 +107,6 @@ Les sections `tracker`, `passes`, `launch` et `transits` prennent les mêmes opt
 
 ```yaml
 type: custom:glossy-iss-tracker-card
-entity: sensor.iss
 carto_api_key: VOTRE_CLE
 ```
 
@@ -108,7 +115,7 @@ carto_api_key: VOTRE_CLE
 
 | Option | Rôle | Défaut |
 | --- | --- | --- |
-| `entity` | Capteur dont les attributs `latitude` et `longitude` donnent la position (par exemple `sensor.iss` de l'intégration officielle **ISS**) | — |
+| `entity` | Facultatif. Capteur dont les attributs `latitude` et `longitude` donnent la position. Vide : position calculée par la carte | — |
 | `status_entity` | Capteur qui décide du vert ou du rouge | `entity` |
 | `lat_entity`, `lon_entity` | Capteurs de repli si les attributs de position manquent | — |
 | `zoom_span` | Largeur de la vue, en degrés | `40` |
@@ -118,6 +125,12 @@ carto_api_key: VOTRE_CLE
 ## Passages ISS — `custom:glossy-iss-passes-card`
 
 ![Passages et transits](https://raw.githubusercontent.com/Marlboro62/ISS/main/images/passages-transits.png)
+
+```yaml
+type: custom:glossy-iss-passes-card
+```
+
+Sans entité, tout est calculé par la carte. Avec vos propres capteurs :
 
 ```yaml
 type: custom:glossy-iss-passes-card
@@ -139,8 +152,9 @@ distance_entity: sensor.distance_iss
 | `global_readable_entity`, `global_attrs_entity` | Les mêmes, pour le passage global | — |
 | `distance_entity` | Capteur de distance de l'ISS, en km | — |
 | `distance_hours` | Heures d'historique du graphique | `12` |
+| `min_elevation` | Calcul intégré : hauteur minimale d'un passage au-dessus de l'horizon, en degrés | `10` |
 
-Une section sans capteur est masquée.
+Dès qu'un capteur est renseigné, la carte n'affiche que les sections dont le capteur est configuré.
 
 ## Transits ISS — `custom:glossy-iss-transit-card`
 

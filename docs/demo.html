@@ -13,7 +13,7 @@
 </head>
 <body>
 <h1>Cartes ISS et espace</h1>
-<p>Démo avec des capteurs fictifs : dates et valeurs inventées, aucune position réelle.
+<p>Démo : position et passages de l'ISS calculés en direct pour un lieu fictif (centre de la France) ; lancement et transits avec des capteurs inventés.
   Couleurs : <select id="theme"><option value="v2">bleu nuit</option><option value="auto">clair</option><option value="ha">Home Assistant</option></select></p>
 <div class="grid" id="grid"></div>
 <script type="module">
@@ -41,11 +41,11 @@ const hist = Array.from({ length: 145 }, (_, i) => ({ s: String(Math.round(6000 
 const params = new URLSearchParams(location.search), theme = params.get("theme") || "v2";
 document.getElementById("theme").value = theme;
 document.getElementById("theme").onchange = (e) => { location.search = "?theme=" + e.target.value; };
-const hass = { themes: { darkMode: theme !== "auto" }, states, connection: { sendMessagePromise: async () => ({ "sensor.distance_iss": hist }) } };
+const hass = { config: { latitude: 46.5, longitude: 2.5, elevation: 200 }, themes: { darkMode: theme !== "auto" }, states, connection: { sendMessagePromise: async () => ({ "sensor.distance_iss": hist }) } };
 const cards = [
-  ["glossy-iss-tracker-card", { entity: "sensor.iss" }],
+  ["glossy-iss-tracker-card", {}],
   ["glossy-launch-card", { entity: "sensor.next_launch_prochain_lancement", mission_entity: "sensor.next_launch_mission_de_lancement", date_entity: "sensor.next_launch_date_de_lancement", probability_entity: "sensor.next_launch_probabilite_de_lancement", status_entity: "sensor.next_launch_statut_de_lancement" }],
-  ["glossy-iss-passes-card", { visible_readable_entity: "sensor.iss_prochain_passage_visible_lisible", visible_attrs_entity: "sensor.iss_prochain_passage_visible", global_readable_entity: "sensor.iss_prochain_passage_global_lisible", global_attrs_entity: "sensor.iss_prochain_passage_global", distance_entity: "sensor.distance_iss" }],
+  ["glossy-iss-passes-card", {}],
   ["glossy-iss-transit-card", { solar_entity: "sensor.iss_next_solar_transit", lunar_entity: "sensor.iss_next_lunar_transit" }],
 ];
 const dash = { title: "SPACE OPERATIONS", tracker: cards[0][1], passes: cards[2][1], launch: cards[1][1], transits: cards[3][1] };
