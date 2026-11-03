@@ -43,20 +43,20 @@ document.getElementById("theme").value = theme;
 document.getElementById("theme").onchange = (e) => { location.search = "?theme=" + e.target.value; };
 const hass = { config: { latitude: 46.5, longitude: 2.5, elevation: 200 }, themes: { darkMode: theme !== "auto" }, states, connection: { sendMessagePromise: async () => ({ "sensor.distance_iss": hist }) } };
 const cards = [
-  ["glossy-iss-tracker-card", {}],
-  ["glossy-launch-card", {}],
-  ["glossy-iss-passes-card", {}],
-  ["glossy-iss-transit-card", {}],
+  ["iss-tracker-card", {}],
+  ["iss-launch-card", {}],
+  ["iss-passes-card", {}],
+  ["iss-transit-card", {}],
 ];
 const dash = { title: "SPACE OPERATIONS", tracker: cards[0][1], passes: cards[2][1], launch: cards[1][1], transits: cards[3][1] };
-cards.unshift(["glossy-space-dashboard-card", dash]);
+cards.unshift(["iss-space-dashboard-card", dash]);
 for (const [type, cfg] of cards) {
   const el = document.createElement(type);
   el.setConfig({ ...cfg, theme: theme === "auto" ? "auto" : theme });
   document.getElementById("grid").appendChild(el);
   el.hass = hass;
 }
-document.querySelector("glossy-space-dashboard-card").style.gridColumn = "1 / -1";
+document.querySelector("iss-space-dashboard-card").style.gridColumn = "1 / -1";
 </script>
 </body>
 </html>

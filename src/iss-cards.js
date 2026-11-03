@@ -3,14 +3,14 @@
  * https://github.com/Marlboro62/ISS
  *
  * Cinq cartes dans un seul fichier :
- *   custom:glossy-iss-tracker-card   position de l'ISS sur une mini-carte
- *   custom:glossy-iss-passes-card    prochains passages ISS + graphique de distance
- *   custom:glossy-iss-transit-card   prochains transits ISS devant le Soleil et la Lune
- *   custom:glossy-launch-card        prochain lancement (intégration Next Launch)
- *   custom:glossy-space-dashboard-card  les quatre en un seul tableau de bord
+ *   custom:iss-tracker-card   position de l'ISS sur une mini-carte
+ *   custom:iss-passes-card    prochains passages ISS + graphique de distance
+ *   custom:iss-transit-card   prochains transits ISS devant le Soleil et la Lune
+ *   custom:iss-launch-card        prochain lancement (intégration Next Launch)
+ *   custom:iss-space-dashboard-card  les quatre en un seul tableau de bord
  */
 
-const CARD_VERSION = "1.0.0";
+const CARD_VERSION = "1.1.0-beta.1";
 
 // Enregistrement sans erreur si une ancienne copie de la carte est encore
 // chargée comme ressource à côté de celle de HACS.
@@ -638,11 +638,11 @@ const _issBindTheme = (ed) => {
 
 /**
  * ISS TRACKER — Position de l'ISS + petite carte
- * type: custom:glossy-iss-tracker-card
+ * type: custom:iss-tracker-card
  *
  * YAML (seule "entity" est requise) :
  *
- *   type: custom:glossy-iss-tracker-card
+ *   type: custom:iss-tracker-card
  *   entity: sensor.iss_position          # fournit latitude/longitude en attributs
  *   status_entity: sensor.iss            # facultatif — état utilisé pour le vert/rouge
  *                                         #   (par défaut : "entity" elle-même)
@@ -876,7 +876,7 @@ const _issTilesHtml = (lat, lon, z, W, H, tileUrl) => {
   return html;
 };
 
-class GlossyIssTrackerCard extends HTMLElement {
+class IssTrackerCard extends HTMLElement {
   constructor() {
     super();
     this.attachShadow({ mode: 'open' });
@@ -904,7 +904,7 @@ class GlossyIssTrackerCard extends HTMLElement {
   }
 
   getCardSize() { return 4; }
-  static getConfigElement() { return document.createElement('glossy-iss-tracker-card-editor'); }
+  static getConfigElement() { return document.createElement('iss-tracker-card-editor'); }
   static getStubConfig() {
     return { entity: '', status_entity: '', lat_entity: '', lon_entity: '', carto_api_key: '', stadia_api_key: '' };
   }
@@ -1039,10 +1039,10 @@ class GlossyIssTrackerCard extends HTMLElement {
   }
 }
 
-define('glossy-iss-tracker-card', GlossyIssTrackerCard);
+define('iss-tracker-card', IssTrackerCard);
 
 // ── Éditeur visuel de carte ──────────────────────────────────────────────
-class GlossyIssTrackerCardEditor extends HTMLElement {
+class IssTrackerCardEditor extends HTMLElement {
   setConfig(config) {
     const c = config || {};
     this._config = {
@@ -1151,16 +1151,16 @@ class GlossyIssTrackerCardEditor extends HTMLElement {
     this.shadowRoot.querySelectorAll('ha-entity-picker').forEach(p => { p.hass = this._hass; });
   }
 }
-define('glossy-iss-tracker-card-editor', GlossyIssTrackerCardEditor);
+define('iss-tracker-card-editor', IssTrackerCardEditor);
 
 /**
  * PASSAGES ISS — Prochains passages ISS (visible/global) + distance
- * type: custom:glossy-iss-passes-card
+ * type: custom:iss-passes-card
  *
  * YAML (tout est facultatif — chaque section ne s'affiche que si son
  * entité "readable" est configurée) :
  *
- *   type: custom:glossy-iss-passes-card
+ *   type: custom:iss-passes-card
  *   title: Passages ISS
  *   visible_readable_entity: sensor.iss_prochain_passage_visible_lisible  # état = date déjà formatée
  *   visible_attrs_entity:    sensor.iss_prochain_passage_visible          # attrs: duration, maxEl, startAzCompass, maxAzCompass, endAzCompass
@@ -1210,7 +1210,7 @@ const _IP_CSS = _ISS_THEME_CSS + `
   .empty-state{text-align:center;padding:20px 12px;color:color-mix(in srgb,var(--g-muted) 52%,transparent);font-size:0.85rem;}
 `;
 
-class GlossyIssPassesCard extends HTMLElement {
+class IssPassesCard extends HTMLElement {
   constructor() {
     super();
     this.attachShadow({ mode: 'open' });
@@ -1242,7 +1242,7 @@ class GlossyIssPassesCard extends HTMLElement {
   }
 
   getCardSize() { return 4; }
-  static getConfigElement() { return document.createElement('glossy-iss-passes-card-editor'); }
+  static getConfigElement() { return document.createElement('iss-passes-card-editor'); }
   static getStubConfig() {
     return {
       title: 'Passages ISS',
@@ -1408,7 +1408,7 @@ class GlossyIssPassesCard extends HTMLElement {
         .filter(v => !isNaN(v));
       this._drawGraph();
     } catch (e) {
-      console.error('[glossy-iss-passes-card] échec du chargement de l\'historique distance :', e);
+      console.error('[iss-passes-card] échec du chargement de l\'historique distance :', e);
     }
   }
 
@@ -1433,10 +1433,10 @@ class GlossyIssPassesCard extends HTMLElement {
   }
 }
 
-define('glossy-iss-passes-card', GlossyIssPassesCard);
+define('iss-passes-card', IssPassesCard);
 
 // ── Éditeur visuel de carte ──────────────────────────────────────────────
-class GlossyIssPassesCardEditor extends HTMLElement {
+class IssPassesCardEditor extends HTMLElement {
   setConfig(config) {
     const c = config || {};
     this._config = {
@@ -1548,11 +1548,11 @@ class GlossyIssPassesCardEditor extends HTMLElement {
     this.shadowRoot.querySelectorAll('ha-entity-picker').forEach(p => { p.hass = this._hass; });
   }
 }
-define('glossy-iss-passes-card-editor', GlossyIssPassesCardEditor);
+define('iss-passes-card-editor', IssPassesCardEditor);
 
 /**
  * TRANSITS ISS — Prochains transits solaires/lunaires de l'ISS
- * type: custom:glossy-iss-transit-card
+ * type: custom:iss-transit-card
  *
  * Pensée pour l'intégration/capteur qui calcule les prochains transits
  * ISS devant le Soleil et la Lune (attributs : date, duration_seconds,
@@ -1561,7 +1561,7 @@ define('glossy-iss-passes-card-editor', GlossyIssPassesCardEditor);
  * YAML (les deux entités sont optionnelles, mais au moins une doit être
  * renseignée pour que la carte affiche quelque chose) :
  *
- *   type: custom:glossy-iss-transit-card
+ *   type: custom:iss-transit-card
  *   title: Transits ISS
  *   solar_entity: sensor.iss_next_solar_transit
  *   lunar_entity: sensor.iss_next_lunar_transit
@@ -1636,7 +1636,7 @@ function _itCountdown(iso) { return _issIn(new Date(iso).getTime()) || null; }
 const _issDuration = (sec) => _itFmtDuration(sec);
 function _itFmtDuration(sec) { return _issDur(sec); }
 
-class GlossyIssTransitCard extends HTMLElement {
+class IssTransitCard extends HTMLElement {
   constructor() {
     super();
     this.attachShadow({ mode: 'open' });
@@ -1660,7 +1660,7 @@ class GlossyIssTransitCard extends HTMLElement {
   }
 
   getCardSize() { return 4; }
-  static getConfigElement() { return document.createElement('glossy-iss-transit-card-editor'); }
+  static getConfigElement() { return document.createElement('iss-transit-card-editor'); }
   static getStubConfig() {
     return { title: 'Transits ISS', solar_entity: '', lunar_entity: '' };
   }
@@ -1839,10 +1839,10 @@ class GlossyIssTransitCard extends HTMLElement {
   }
 }
 
-define('glossy-iss-transit-card', GlossyIssTransitCard);
+define('iss-transit-card', IssTransitCard);
 
 // ── Éditeur visuel de carte ──────────────────────────────────────────────
-class GlossyIssTransitCardEditor extends HTMLElement {
+class IssTransitCardEditor extends HTMLElement {
   setConfig(config) {
     const c = config || {};
     this._config = {
@@ -1935,18 +1935,18 @@ class GlossyIssTransitCardEditor extends HTMLElement {
     this.shadowRoot.querySelectorAll('ha-entity-picker').forEach(p => { p.hass = this._hass; });
   }
 }
-define('glossy-iss-transit-card-editor', GlossyIssTransitCardEditor);
+define('iss-transit-card-editor', IssTransitCardEditor);
 
 /**
  * PROCHAIN LANCEMENT — Prochain lancement (Next Launch)
- * type: custom:glossy-launch-card
+ * type: custom:iss-launch-card
  *
  * Pensée pour l'intégration HACS "Next Launch" (plusieurs capteurs :
  * infos générales, mission, date, probabilité météo, statut).
  *
  * YAML (seule "entity" est requise) :
  *
- *   type: custom:glossy-launch-card
+ *   type: custom:iss-launch-card
  *   entity: sensor.next_launch_prochain_lancement          # provider, pad, facility (attributs)
  *   mission_entity: sensor.next_launch_mission_de_lancement # nom mission, target_orbit, rocket_name, description
  *   date_entity: sensor.next_launch_date_de_lancement       # date/heure ISO
@@ -2015,7 +2015,7 @@ const _LC_CSS = _ISS_THEME_CSS + `
   .empty-state{text-align:center;padding:26px 12px;color:color-mix(in srgb,var(--g-muted) 52%,transparent);font-size:0.85rem;}
 `;
 
-class GlossyLaunchCard extends HTMLElement {
+class IssLaunchCard extends HTMLElement {
   constructor() {
     super();
     this.attachShadow({ mode: 'open' });
@@ -2041,7 +2041,7 @@ class GlossyLaunchCard extends HTMLElement {
   }
 
   getCardSize() { return 4; }
-  static getConfigElement() { return document.createElement('glossy-launch-card-editor'); }
+  static getConfigElement() { return document.createElement('iss-launch-card-editor'); }
   static getStubConfig() {
     return { entity: '', mission_entity: '', date_entity: '', probability_entity: '', status_entity: '' };
   }
@@ -2181,10 +2181,10 @@ class GlossyLaunchCard extends HTMLElement {
   }
 }
 
-define('glossy-launch-card', GlossyLaunchCard);
+define('iss-launch-card', IssLaunchCard);
 
 // ── Éditeur visuel de carte ──────────────────────────────────────────────
-class GlossyLaunchCardEditor extends HTMLElement {
+class IssLaunchCardEditor extends HTMLElement {
   setConfig(config) {
     const c = config || {};
     this._config = {
@@ -2282,7 +2282,7 @@ class GlossyLaunchCardEditor extends HTMLElement {
     this.shadowRoot.querySelectorAll('ha-entity-picker').forEach(p => { p.hass = this._hass; });
   }
 }
-define('glossy-launch-card-editor', GlossyLaunchCardEditor);
+define('iss-launch-card-editor', IssLaunchCardEditor);
 
 // ── Tableau de bord complet (les quatre cartes en une) ──────────────────
 const _GS_CSS = _ISS_THEME_CSS + `
@@ -2296,11 +2296,11 @@ function _gsDate(v){const d=new Date(v);return isNaN(d.getTime())?'—':d.toLoca
 function _gsCountdown(v){return _issIn(new Date(v).getTime())}
 const _gsDuration=_issDuration;
 
-class GlossySpaceDashboardCard extends HTMLElement{
+class IssSpaceDashboardCard extends HTMLElement{
  constructor(){super();this.attachShadow({mode:'open'});this._ok=false;this._h=null;this._resize=null;this._history=null;this._historyAt=0}
  setConfig(c){c=c||{};this._config={theme:c.theme||'v2',demo:!!c.demo,title:c.title||'OPÉRATIONS SPATIALES',tracker:{...(c.tracker||{}),lat_entity:'',lon_entity:''},passes:{...(c.passes||{})},launch:{...(c.launch||{})},transits:{...(c.transits||{})}};this._fp=null;this._history=null;this._uz=null;this._follow=true;this._center=null;this._onZoom=()=>this._showZoom();if(this._ok){this._build();if(this._h)this.hass=this._h}}
  getCardSize(){return 8}
- static getConfigElement(){return document.createElement('glossy-space-dashboard-card-editor')}
+ static getConfigElement(){return document.createElement('iss-space-dashboard-card-editor')}
  static getStubConfig(){return {title:'OPÉRATIONS SPATIALES',tracker:{entity:''},passes:{},launch:{entity:''},transits:{}}}
  set hass(h){this._h=h;if(!this._config)return;_issTheme(this,this._config.theme,h);const t=this._config.tracker||{};let cleaned=false;for(const key of ['lat_entity','lon_entity']){if(t[key]&&!h.states[t[key]]){t[key]='';cleaned=true}}if(cleaned)this._config={...this._config,tracker:{...t}};if(!this._ok)this._init();const ids=this._ids();const fp=ids.map(id=>{const s=h.states[id];return id+'|'+(s?.state||'x')+'|'+JSON.stringify(s?.attributes||{})}).join('||');if(fp===this._fp)return;this._fp=fp;this._update()}
  _ids(){const c=this._config||{};return [c.tracker.entity,c.tracker.status_entity,c.passes.visible_readable_entity,c.passes.visible_attrs_entity,c.passes.global_readable_entity,c.passes.global_attrs_entity,c.passes.distance_entity,c.launch.entity,c.launch.mission_entity,c.launch.date_entity,c.launch.probability_entity,c.launch.status_entity,c.transits.solar_entity,c.transits.lunar_entity].filter(Boolean)}
@@ -2317,7 +2317,7 @@ class GlossySpaceDashboardCard extends HTMLElement{
  _showZoom(){const z=this._w&&this._w.querySelector('#tracker-zoom');if(z)z.textContent=String(Math.round(_issZ(this,(this._config.tracker||{}).zoom_span)))}
  _drawTiles(){const map=this._w&&this._w.querySelector('#map');if(map&&this._pos&&!this._pos.tile&&map.querySelector('.vmap')){map.querySelector('.dot')?.style.setProperty('--dc',this._pos.color);_issVector(this,map,this._pos.lat,this._pos.lon,_issZ(this,this._config.tracker.zoom_span),_issLight(this)).catch(e=>{_issDropVector(this);map.innerHTML=`<div class="map-empty">Carte indisponible : ${_gsEsc(e.message)}</div>`});return}if(!map||!this._pos)return;const p=this._pos,z=Math.round(Math.min(10,_issZ(this,this._config.tracker.zoom_span)));this._iss={lat:p.lat,lon:p.lon};this._rz=z;map.querySelector('.dot')?.style.setProperty('--dc',p.color);_issRaster(this,map,p.lat,p.lon,z,p.tile,()=>this._drawTiles())}
  _updatePasses(){const c=this._config.passes||{},s=this._h.states;if(this._passLive()){_ISS.load();const oh=_issObsHass(this._h,this._config.demo),msg=_issLive.problem(oh),m=this._w.querySelector('#live-msg');if(m){m.hidden=!msg;m.textContent=msg||''}const nx=msg?null:_issLive.next(oh,c.min_elevation!=null?Number(c.min_elevation):10,10,c.min_visible!=null?Number(c.min_visible):120),pv=this._w.querySelector('#pass-visible'),pg=this._w.querySelector('#pass-global');if(pv)pv.innerHTML=msg?'':_issLive.lines(nx&&nx.visible,_gsEsc);if(pg)pg.innerHTML=msg?'':_issLive.lines(nx&&nx.global,_gsEsc);const d=_issLive.distance(oh),dn=this._w.querySelector('#distance-now');if(dn)dn.textContent=d===null?'—':Math.round(d).toLocaleString('fr-FR');this._history=_issLive.history(oh,c.distance_hours||12);this._drawHistory();return}const render=(id,readId,attrId)=>{const el=this._w.querySelector('#'+id);if(!el)return;const read=s[readId],a=s[attrId]?.attributes||{};let h=`<p><strong>Début :</strong> ${_gsEsc(read?.state||'—')}</p>`;if(a.duration!=null)h+=`<p><strong>Durée :</strong> ${_issDur(a.duration)}</p>`;if(a.maxEl!=null)h+=`<p><strong>Hauteur max :</strong> ${_gsEsc(_issNum(a.maxEl,1))}°</p>`;const path=[a.startAzCompass,a.maxAzCompass,a.endAzCompass].filter(Boolean).join(' → ');if(path)h+=`<p><strong>Trajet :</strong> ${_gsEsc(_issCardFr(path))}</p>`;el.innerHTML=h};render('pass-visible',c.visible_readable_entity,c.visible_attrs_entity);render('pass-global',c.global_readable_entity,c.global_attrs_entity);const st=s[c.distance_entity],now=this._w.querySelector('#distance-now');if(now&&st){const n=parseFloat(st.state);now.textContent=Number.isFinite(n)?Math.round(n).toLocaleString('fr-FR'):'—'}if(c.distance_entity)this._loadHistory()}
- async _loadHistory(){const c=this._config.passes||{};if(!this._h?.connection||!c.distance_entity)return;if(Date.now()-this._historyAt<300000&&this._history)return;this._historyAt=Date.now();try{const start=new Date(Date.now()-(c.distance_hours||12)*3600000).toISOString();const r=await this._h.connection.sendMessagePromise({type:'history/history_during_period',start_time:start,entity_ids:[c.distance_entity],minimal_response:true,no_attributes:true});this._history=(r?.[c.distance_entity]||[]).map(x=>parseFloat(x.s??x.state)).filter(Number.isFinite);this._drawHistory()}catch(e){console.warn('[glossy-space-dashboard-card] history unavailable',e)}}
+ async _loadHistory(){const c=this._config.passes||{};if(!this._h?.connection||!c.distance_entity)return;if(Date.now()-this._historyAt<300000&&this._history)return;this._historyAt=Date.now();try{const start=new Date(Date.now()-(c.distance_hours||12)*3600000).toISOString();const r=await this._h.connection.sendMessagePromise({type:'history/history_during_period',start_time:start,entity_ids:[c.distance_entity],minimal_response:true,no_attributes:true});this._history=(r?.[c.distance_entity]||[]).map(x=>parseFloat(x.s??x.state)).filter(Number.isFinite);this._drawHistory()}catch(e){console.warn('[iss-space-dashboard-card] history unavailable',e)}}
  _drawHistory(){const svg=this._w.querySelector('#distance-graph'),v=this._history;if(!svg||!v||v.length<2)return;const min=Math.min(...v),range=Math.max(...v)-min||1,W=300,H=55,p=v.map((n,i)=>`${(i/(v.length-1)*W).toFixed(1)},${(H-5-((n-min)/range)*(H-10)).toFixed(1)}`).join(' ');svg.innerHTML=`<polygon points="0,${H} ${p} ${W},${H}" style="fill:color-mix(in srgb,var(--g-acc) 15%,transparent)"/><polyline points="${p}" fill="none" stroke-width="2" style="stroke:var(--g-acc)"/>`}
  _updateLaunch(){const live=!(this._config.launch||{}).entity,vs=live?_issLaunch.states():null;if(live)_issLaunch.load();const c=live?{...(this._config.launch||{}),..._issLaunch.VCFG}:this._config.launch||{},s=vs?{...this._h.states,...vs}:this._h.states;if(live&&!vs){const m=this._w.querySelector('#launch-mission');if(m)m.textContent=_issLaunch.failed?'Prochain lancement indisponible (Launch Library 2)':'Chargement du prochain lancement…';return}const main=s[c.entity],mission=s[c.mission_entity],date=s[c.date_entity],proba=s[c.probability_entity],status=s[c.status_entity];const q=id=>this._w.querySelector('#'+id);if(q('launch-provider'))q('launch-provider').textContent=main?.attributes?.provider||'—';if(q('launch-mission'))q('launch-mission').textContent=mission?.state||main?.state||'—';if(q('launch-date'))q('launch-date').textContent=date?.state?_gsDate(date.state):'—';{const m=(new Date(date?.state).getTime()-Date.now())/60000;this._w.querySelector('#launch-panel')?.classList.toggle('imminent',Number.isFinite(m)&&m>0&&m<(c.imminent_minutes??15))}if(q('launch-info')){const a=main?.attributes||{};q('launch-info').innerHTML=a.pad?`📍 <b>${_gsEsc(a.pad)}</b>${a.facility?`<br><small>${_gsEsc(a.facility)}</small>`:''}`:''}if(q('launch-stats')){const a=mission?.attributes||{};q('launch-stats').innerHTML=`<div><b>Météo</b><span>${proba?.state&&!['unknown','unavailable'].includes(proba.state)?_gsEsc(proba.state)+'%':'Pas de données'}</span></div><div><b>Lanceur</b><span>${_gsEsc(a.rocket_name||'—')}</span></div><div><b>Orbite</b><span>${_gsEsc(_issFr.orbit(a.target_orbit)||'—')}</span></div>${c.status_entity?`<div class="${/go/i.test(status?.state||'')?'good':'warn'}"><b>Statut</b><b>${_gsEsc(_issFr.status(status?.state)||'—')}</b></div>`:''}`}if(q('launch-desc'))q('launch-desc').textContent=_issFr.text(mission?.attributes?.description);if(!this._offFr)this._offFr=_issFr.onChange(()=>this._h&&this._updateLaunch())}
  _updateTransits(){const live=this._transLive(),c=live?{solar_entity:'iss.transit.solar',lunar_entity:'iss.transit.lunar'}:this._config.transits||{},oh=_issObsHass(this._h,this._config.demo),vs=live?_issTransit.states(oh):null,s=vs?{...this._h.states,...vs}:this._h.states,msg=live?_issLive.problem(oh):null;for(const type of ['solar','lunar']){const body=this._w.querySelector('#transit-body-'+type),st=s[c[type+'_entity']];if(body&&msg){body.innerHTML=`<div class="empty">${_gsEsc(msg)}</div>`;continue}if(!body||!st)continue;const a=st.attributes||{},date=a.date;if(!date){body.innerHTML=`<div class="empty">Aucun transit prévu ${live?'dans les 14 prochains jours':"dans l'année"}.${a.closest_approach_deg!=null?`<br>Approche la plus proche : <b>${_issNum(a.closest_approach_deg,1)}°</b>`:''}</div>`;continue}body.innerHTML=`<div class="transit-date">${_gsEsc(_gsDate(date))}</div><span class="transit-count">${_gsEsc(_gsCountdown(date))}</span><div class="metrics"><div class="metric"><small>Durée</small><b>${_gsDuration(a.duration_seconds)}</b></div><div class="metric"><small>Hauteur</small><b>${a.max_elevation_deg!=null?_issNum(a.max_elevation_deg,1)+'°':'—'}</b></div>${type==='lunar'?`<div class="metric" style="grid-column:1/-1"><small>Distance ISS</small><b>${a.iss_distance_km!=null?Math.round(a.iss_distance_km).toLocaleString('fr-FR')+' km':'—'}</b></div>`:''}</div>`}}
@@ -2325,13 +2325,13 @@ class GlossySpaceDashboardCard extends HTMLElement{
  connectedCallback(){if(this._ok&&!this._tick)this._startTick()}
  disconnectedCallback(){_issDropVector(this);const mv=this._w&&this._w.querySelector('#map .vmap');if(mv)mv.parentElement.innerHTML='';if(this._resize){this._resize.disconnect();this._resize=null}clearInterval(this._tick);this._tick=null;if(this._offLoad){this._offLoad();this._offLoad=null}}
 }
-define('glossy-space-dashboard-card', GlossySpaceDashboardCard);
+define('iss-space-dashboard-card', IssSpaceDashboardCard);
 
-class GlossySpaceDashboardCardEditor extends HTMLElement{
- setConfig(config){const c=config||{};this._config={type:'custom:glossy-space-dashboard-card',theme:c.theme||'v2',...(c.demo?{demo:true}:{}),title:c.title||'OPÉRATIONS SPATIALES',tracker:{...(c.tracker||{}),lat_entity:'',lon_entity:''},passes:{...(c.passes||{})},launch:{...(c.launch||{})},transits:{...(c.transits||{})}};if(this._hass&&!this._built)this._render()}
+class IssSpaceDashboardCardEditor extends HTMLElement{
+ setConfig(config){const c=config||{};this._config={type:'custom:iss-space-dashboard-card',theme:c.theme||'v2',...(c.demo?{demo:true}:{}),title:c.title||'OPÉRATIONS SPATIALES',tracker:{...(c.tracker||{}),lat_entity:'',lon_entity:''},passes:{...(c.passes||{})},launch:{...(c.launch||{})},transits:{...(c.transits||{})}};if(this._hass&&!this._built)this._render()}
  set hass(hass){this._hass=hass;if(!this._built)this._render();else this._syncPickers()}
  connectedCallback(){if(this._config)this._render()}
- _emit(){this._config={...this._config,type:'custom:glossy-space-dashboard-card'};this.dispatchEvent(new CustomEvent('config-changed',{detail:{config:this._config},bubbles:true,composed:true}))}
+ _emit(){this._config={...this._config,type:'custom:iss-space-dashboard-card'};this.dispatchEvent(new CustomEvent('config-changed',{detail:{config:this._config},bubbles:true,composed:true}))}
  _esc(v){return (v??'').toString().replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
  _render(){if(!this._config||!this._hass)return;if(!this.shadowRoot)this.attachShadow({mode:'open'});const c=this._config,t=c.tracker||{},p=c.passes||{},l=c.launch||{},x=c.transits||{};this.shadowRoot.innerHTML=`<style>
   .wrap{padding:4px 0;font-family:var(--paper-font-body1_-_font-family,Arial,sans-serif)}.group{margin:16px 0 20px;padding:12px;border:1px solid var(--divider-color,#555);border-radius:10px}.group h3{margin:0 0 12px;font-size:13px;color:var(--primary-text-color,#eee)}.field{margin:0 0 11px}.field:last-child{margin-bottom:0}label{display:block;margin:0 0 4px;font-size:12px;color:var(--secondary-text-color,#999)}input{width:100%;box-sizing:border-box;padding:8px;border:1px solid var(--divider-color,#555);border-radius:6px;background:var(--card-background-color,#1c1c1c);color:var(--primary-text-color,#eee)}.hint{font-size:11px;line-height:1.4;color:var(--secondary-text-color,#888);margin-top:-4px;margin-bottom:12px}
@@ -2347,16 +2347,26 @@ class GlossySpaceDashboardCardEditor extends HTMLElement{
  }
  _syncPickers(){if(!this.shadowRoot)return;this.shadowRoot.querySelectorAll('ha-entity-picker').forEach(p=>{p.hass=this._hass})}
 }
-define('glossy-space-dashboard-card-editor', GlossySpaceDashboardCardEditor);
+define('iss-space-dashboard-card-editor', IssSpaceDashboardCardEditor);
 
 window.customCards = window.customCards || [];
 for (const card of [
-  { type: 'glossy-iss-tracker-card', name: "Suivi de l'ISS", description: "Position de l'ISS en direct sur une mini-carte" },
-  { type: 'glossy-iss-passes-card', name: 'Passages ISS', description: 'Prochains passages ISS (visible et global) et graphique de la distance' },
-  { type: 'glossy-iss-transit-card', name: 'Transits ISS', description: 'Prochains transits de l\'ISS devant le Soleil et la Lune' },
-  { type: 'glossy-space-dashboard-card', name: 'Opérations spatiales', description: 'Tableau de bord complet : ISS, passages, lancement et transits' },
-  { type: 'glossy-launch-card', name: 'Prochain lancement', description: 'Prochain lancement (Next Launch) : mission, compte à rebours, pas de tir, météo, statut' },
+  { type: 'iss-tracker-card', name: "Suivi de l'ISS", description: "Position de l'ISS en direct sur une mini-carte" },
+  { type: 'iss-passes-card', name: 'Passages ISS', description: 'Prochains passages ISS (visible et global) et graphique de la distance' },
+  { type: 'iss-transit-card', name: 'Transits ISS', description: 'Prochains transits de l\'ISS devant le Soleil et la Lune' },
+  { type: 'iss-space-dashboard-card', name: 'Opérations spatiales', description: 'Tableau de bord complet : ISS, passages, lancement et transits' },
+  { type: 'iss-launch-card', name: 'Prochain lancement', description: 'Prochain lancement (Next Launch) : mission, compte à rebours, pas de tir, météo, statut' },
 ]) if (!window.customCards.some((c) => c.type === card.type)) window.customCards.push({ ...card, preview: true });
+
+// Anciens types de carte (1.0.0) : toujours acceptés pour ne pas casser les tableaux de bord existants,
+// mais absents du sélecteur de cartes.
+for (const [name, cls] of [
+  ['glossy-space-dashboard-card', IssSpaceDashboardCard],
+  ['glossy-iss-tracker-card', IssTrackerCard],
+  ['glossy-iss-passes-card', IssPassesCard],
+  ['glossy-iss-transit-card', IssTransitCard],
+  ['glossy-launch-card', IssLaunchCard],
+]) define(name, class extends cls {});
 
 console.info(
   `%c CARTES ISS %c ${CARD_VERSION} `,
