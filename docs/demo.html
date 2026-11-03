@@ -13,7 +13,7 @@
 </head>
 <body>
 <h1>Cartes ISS et espace</h1>
-<p>Démo : position et passages de l'ISS calculés en direct pour un lieu fictif (centre de la France) ; lancement et transits avec des capteurs inventés.
+<p>Démo : position et passages de l'ISS calculés en direct pour un lieu fictif (centre de la France) ; prochain lancement lu sur Launch Library 2.
   Couleurs : <select id="theme"><option value="v2">bleu nuit</option><option value="auto">clair</option><option value="ha">Home Assistant</option></select></p>
 <div class="grid" id="grid"></div>
 <script type="module">
@@ -44,9 +44,9 @@ document.getElementById("theme").onchange = (e) => { location.search = "?theme="
 const hass = { config: { latitude: 46.5, longitude: 2.5, elevation: 200 }, themes: { darkMode: theme !== "auto" }, states, connection: { sendMessagePromise: async () => ({ "sensor.distance_iss": hist }) } };
 const cards = [
   ["glossy-iss-tracker-card", {}],
-  ["glossy-launch-card", { entity: "sensor.next_launch_prochain_lancement", mission_entity: "sensor.next_launch_mission_de_lancement", date_entity: "sensor.next_launch_date_de_lancement", probability_entity: "sensor.next_launch_probabilite_de_lancement", status_entity: "sensor.next_launch_statut_de_lancement" }],
+  ["glossy-launch-card", {}],
   ["glossy-iss-passes-card", {}],
-  ["glossy-iss-transit-card", { solar_entity: "sensor.iss_next_solar_transit", lunar_entity: "sensor.iss_next_lunar_transit" }],
+  ["glossy-iss-transit-card", {}],
 ];
 const dash = { title: "SPACE OPERATIONS", tracker: cards[0][1], passes: cards[2][1], launch: cards[1][1], transits: cards[3][1] };
 cards.unshift(["glossy-space-dashboard-card", dash]);

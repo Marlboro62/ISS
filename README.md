@@ -38,7 +38,10 @@
 | `custom:glossy-iss-transit-card` | **Transits ISS** : prochains passages de l'ISS devant le Soleil et la Lune, avec compte à rebours |
 | `custom:glossy-launch-card` | **Prochain lancement** : agence, mission, date (rouge clignotant juste avant le décollage), pas de tir, météo, lanceur, orbite, statut |
 
-**Rien à installer pour l'ISS** : sans capteur configuré, la position de l'ISS, sa distance et les prochains passages au-dessus de chez vous sont **calculés par la carte**, dans le navigateur. Ni intégration, ni package YAML, ni clé N2YO. Le lancement et les transits lisent des capteurs Home Assistant. Toutes les cartes ont un **éditeur visuel**.
+**Rien à installer** : sans capteur configuré, les cartes font tout elles-mêmes, dans le navigateur. Ni intégration, ni package YAML, ni clé N2YO. Toutes ont un **éditeur visuel**.
+
+- **ISS** : position, distance, prochains passages et **transits devant le Soleil et la Lune**, calculés par la carte.
+- **Prochain lancement** : lu sur [Launch Library 2](https://thespacedevs.com/llapi) (The Space Devs), gratuit et sans clé, la source de l'intégration Next Launch. Une requête toutes les 30 minutes, partagée par toutes les cartes.
 
 ### Calcul intégré de l'ISS
 
@@ -48,6 +51,9 @@
   - le **prochain passage visible à l'œil nu** : ISS éclairée par le Soleil, ciel noir chez vous (Soleil à plus de 6° sous l'horizon) ;
   - le **prochain passage global** : au-dessus de la hauteur minimale, de jour comme de nuit.
 - **Distance** au sol entre chez vous et le point sous l'ISS, avec la courbe des dernières heures.
+- **Transits** des 14 prochains jours : passages de l'ISS devant le disque du Soleil ou de la Lune vus de chez vous (position de la Lune d'après Meeus), avec la durée, la hauteur et la distance de l'ISS. Sans transit, l'approche la plus proche, en degrés.
+
+Un transit ne se voit que sur une bande de quelques kilomètres de large, et l'orbite de l'ISS change à chaque correction : vérifiez l'heure exacte la veille sur un site spécialisé avant d'aller observer.
 
 Votre position reste dans votre navigateur : elle n'est envoyée à aucun service.
 
@@ -91,15 +97,10 @@ tracker:
 passes:
   min_elevation: 10
 launch:
-  entity: sensor.next_launch_prochain_lancement
-  mission_entity: sensor.next_launch_mission_de_lancement
-  date_entity: sensor.next_launch_date_de_lancement
-  probability_entity: sensor.next_launch_probabilite_de_lancement
-  status_entity: sensor.next_launch_statut_de_lancement
-transits:
-  solar_entity: sensor.iss_next_solar_transit
-  lunar_entity: sensor.iss_next_lunar_transit
+  imminent_minutes: 15
 ```
+
+Sans entité, chaque section est remplie par le calcul intégré ou par Launch Library 2.
 
 Les sections `tracker`, `passes`, `launch` et `transits` prennent les mêmes options que les cartes séparées, décrites ci-dessous. `title` change le titre du bandeau, `theme` les couleurs de tout le tableau de bord.
 
@@ -166,6 +167,13 @@ lunar_entity: sensor.iss_next_lunar_transit
 
 - Date du prochain **transit solaire** et **lunaire**, compte à rebours, durée, élévation, et distance de l'ISS pour la Lune.
 - Sans transit prévu, l'approche la plus proche.
+- **Sans entité**, les transits sont calculés par la carte sur les 14 prochains jours (voir [Calcul intégré de l'ISS](#calcul-intégré-de-liss)).
+
+```yaml
+type: custom:glossy-iss-transit-card
+```
+
+Avec vos propres capteurs :
 
 | Option | Rôle | Défaut |
 | --- | --- | --- |
@@ -187,7 +195,13 @@ probability_entity: sensor.next_launch_probabilite_de_lancement
 status_entity: sensor.next_launch_statut_de_lancement
 ```
 
-Faite pour l'intégration HACS **Next Launch**.
+**Sans entité**, la carte lit le prochain lancement sur Launch Library 2 :
+
+```yaml
+type: custom:glossy-launch-card
+```
+
+Elle lit aussi les capteurs de l'intégration HACS **Next Launch**, quand ils sont renseignés (exemple ci-dessus).
 
 | Option | Rôle | Défaut |
 | --- | --- | --- |
