@@ -48,7 +48,7 @@
 - **Éléments orbitaux** (TLE) de l'ISS téléchargés depuis [CelesTrak](https://celestrak.org/), ou [wheretheiss.at](https://wheretheiss.at/) en secours : gratuits, sans clé, rafraîchis toutes les 6 heures et gardés dans le navigateur. Une seule requête pour toutes les cartes.
 - **Position** calculée toutes les 5 secondes avec le modèle SGP4, celui de N2YO et de CelesTrak.
 - **Passages** des 10 prochains jours depuis le **lieu de Home Assistant** (Paramètres › Système › Général) :
-  - le **prochain passage visible à l'œil nu** : ISS éclairée par le Soleil, ciel noir chez vous (Soleil à plus de 6° sous l'horizon) ;
+  - le **prochain passage visible à l'œil nu** : ISS éclairée par le Soleil, ciel noir chez vous (Soleil à plus de 6° sous l'horizon), au moins 2 minutes, comme N2YO ;
   - le **prochain passage global** : au-dessus de la hauteur minimale, de jour comme de nuit.
 - **Distance** au sol entre chez vous et le point sous l'ISS, avec la courbe des dernières heures.
 - **Transits** des 14 prochains jours : passages de l'ISS devant le disque du Soleil ou de la Lune vus de chez vous (position de la Lune d'après Meeus), avec la durée, la hauteur et la distance de l'ISS. Sans transit, l'approche la plus proche, en degrés.
@@ -154,6 +154,7 @@ distance_entity: sensor.distance_iss
 | `distance_entity` | Capteur de distance de l'ISS, en km | — |
 | `distance_hours` | Heures d'historique du graphique | `12` |
 | `min_elevation` | Calcul intégré : hauteur minimale d'un passage au-dessus de l'horizon, en degrés | `10` |
+| `min_visible` | Calcul intégré : durée minimale à l'œil nu d'un passage visible, en secondes | `120` |
 
 Dès qu'un capteur est renseigné, la carte n'affiche que les sections dont le capteur est configuré.
 
