@@ -93,7 +93,7 @@ Les quatre cartes en un seul tableau de bord : bandeau de titre, ISS Tracker (av
 type: custom:glossy-space-dashboard-card
 title: SPACE OPERATIONS
 tracker:
-  carto_api_key: VOTRE_CLE
+  zoom_span: 40
 passes:
   min_elevation: 10
 launch:
@@ -108,11 +108,10 @@ Les sections `tracker`, `passes`, `launch` et `transits` prennent les mêmes opt
 
 ```yaml
 type: custom:glossy-iss-tracker-card
-carto_api_key: VOTRE_CLE
 ```
 
 - Position de l'ISS (latitude et longitude) dans le bandeau, **en vert** quand le capteur répond, **en rouge clignotant** quand le signal est perdu.
-- **Mini-carte** centrée sur l'ISS, en tuiles sombres [Stadia Maps](https://client.stadiamaps.com/) ou [CARTO](https://carto.com/basemaps/apikey). Il faut **une clé gratuite** de l'un des deux : OpenStreetMap bloque l'affichage de ses tuiles dans une application tierce. Sans clé, la carte l'indique à la place de l'image. La clé reste dans la configuration de votre tableau de bord.
+- **Mini-carte** centrée sur l'ISS, avec **les fonds de la carte de Home Assistant** (CARTO, sans clé), sombres ou clairs selon le thème. Une clé gratuite [Stadia Maps](https://client.stadiamaps.com/) ou [CARTO](https://carto.com/basemaps/apikey) est facultative : elle donne leurs propres fonds. La clé reste dans la configuration de votre tableau de bord.
 
 | Option | Rôle | Défaut |
 | --- | --- | --- |
@@ -120,8 +119,8 @@ carto_api_key: VOTRE_CLE
 | `status_entity` | Capteur qui décide du vert ou du rouge | `entity` |
 | `lat_entity`, `lon_entity` | Capteurs de repli si les attributs de position manquent | — |
 | `zoom_span` | Largeur de la vue, en degrés | `40` |
-| `stadia_api_key` | Clé Stadia Maps (prioritaire) | — |
-| `carto_api_key` | Clé CARTO (si pas de clé Stadia) | — |
+| `stadia_api_key` | Facultatif : clé Stadia Maps (prioritaire) | — |
+| `carto_api_key` | Facultatif : clé CARTO | — |
 
 ## Passages ISS — `custom:glossy-iss-passes-card`
 
