@@ -44,6 +44,10 @@
 - **Prochain lancement** : lu sur [Launch Library 2](https://thespacedevs.com/llapi) (The Space Devs), gratuit et sans clé, la source de l'intégration Next Launch. Une requête toutes les 30 minutes, partagée par toutes les cartes.
 - **En français** : statut et orbite traduits par la carte ; description traduite par le traducteur intégré du navigateur (Chrome, sur l'appareil) quand le français y est prêt, sinon par le service gratuit [MyMemory](https://mymemory.translated.net/). Les traductions sont gardées dans le navigateur ; les noms propres (agence, mission, lanceur, pas de tir) restent tels quels.
 
+### Mode démo
+
+Option `demo: true` (case « Mode démo » dans l'éditeur) sur Passages ISS, Transits ISS et Opérations spatiales : passages, distance et transits sont calculés pour un **lieu fictif** (centre de la France) au lieu de la position de Home Assistant. Pratique pour partager une capture d'écran sans montrer où vous habitez ; un badge « DÉMO » le signale.
+
 ### Calcul intégré de l'ISS
 
 - **Éléments orbitaux** (TLE) de l'ISS téléchargés depuis [CelesTrak](https://celestrak.org/), ou [wheretheiss.at](https://wheretheiss.at/) en secours : gratuits, sans clé, rafraîchis toutes les 6 heures et gardés dans le navigateur. Une seule requête pour toutes les cartes.
@@ -103,7 +107,7 @@ launch:
 
 Sans entité, chaque section est remplie par le calcul intégré ou par Launch Library 2.
 
-Les sections `tracker`, `passes`, `launch` et `transits` prennent les mêmes options que les cartes séparées, décrites ci-dessous. `title` change le titre du bandeau, `theme` les couleurs de tout le tableau de bord.
+Les sections `tracker`, `passes`, `launch` et `transits` prennent les mêmes options que les cartes séparées, décrites ci-dessous. `title` change le titre du bandeau, `theme` les couleurs de tout le tableau de bord, `demo: true` passe tout le tableau de bord en mode démo.
 
 ## Suivi de l’ISS — `custom:glossy-iss-tracker-card`
 
@@ -150,6 +154,7 @@ distance_entity: sensor.distance_iss
 | Option | Rôle | Défaut |
 | --- | --- | --- |
 | `title` | Titre | `Passages ISS` |
+| `demo` | Mode démo : lieu fictif au lieu de celui de Home Assistant | `false` |
 | `visible_readable_entity` | Capteur dont l'état est la date du passage visible, déjà mise en forme | — |
 | `visible_attrs_entity` | Capteur dont les attributs donnent `duration` (en secondes), `maxEl`, `startAzCompass`, `maxAzCompass`, `endAzCompass` | — |
 | `global_readable_entity`, `global_attrs_entity` | Les mêmes, pour le passage global | — |
@@ -181,6 +186,7 @@ lunar_entity: sensor.iss_next_lunar_transit
 | Option | Rôle | Défaut |
 | --- | --- | --- |
 | `title` | Titre | `Transits ISS` |
+| `demo` | Mode démo : lieu fictif au lieu de celui de Home Assistant | `false` |
 | `solar_entity`, `lunar_entity` | Capteurs dont les attributs donnent `date`, `duration_seconds`, `max_elevation_deg`, `iss_distance_km`, `closest_approach_deg` | — |
 
 > Observer un transit solaire demande un **filtre solaire homologué** : ne regardez jamais le Soleil sans protection, ni à l'œil nu ni avec un instrument.

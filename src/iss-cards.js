@@ -10,7 +10,7 @@
  *   custom:glossy-space-dashboard-card  les quatre en un seul tableau de bord
  */
 
-const CARD_VERSION = "0.9.0-beta.1";
+const CARD_VERSION = "1.0.0";
 
 // Enregistrement sans erreur si une ancienne copie de la carte est encore
 // chargée comme ressource à côté de celle de HACS.
@@ -615,6 +615,15 @@ const _issIn = (ms) => {
   return d > 0 ? `dans ${d} j ${h} h` : h > 0 ? `dans ${h} h ${String(m).padStart(2, '0')} min` : `dans ${m} min`;
 };
 
+// ── Mode démo : passages, distance et transits calculés pour un lieu fictif (captures d'écran sans votre position) ──
+const _ISS_DEMO_SITE = { latitude: 46.5, longitude: 2.5, elevation: 200 }; // centre de la France
+const _issObsHass = (h, demo) => (demo && h ? { ...h, config: { ...(h.config || {}), ..._ISS_DEMO_SITE } } : h);
+const _issDemoField = (on) => `<div class="field"><label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input id="demo" type="checkbox" style="width:auto"${on ? ' checked' : ''}> Mode démo : lieu fictif (centre de la France) au lieu de la position de Home Assistant, pour les captures d'écran</label></div>`;
+const _issBindDemo = (ed) => {
+  const el = ed.shadowRoot && ed.shadowRoot.getElementById('demo');
+  if (el) el.addEventListener('change', (e) => { ed._config = { ...ed._config, demo: e.target.checked }; if (!e.target.checked) delete ed._config.demo; ed._emit(); });
+};
+
 const _ISS_THEMES = [
   ['v2', 'Style MyElectricalData (bleu nuit)'],
   ['auto', 'Style MyElectricalData, clair ou sombre selon Home Assistant'],
@@ -1216,6 +1225,7 @@ class GlossyIssPassesCard extends HTMLElement {
     config = config || {};
     this._config = {
       theme: config.theme || 'v2',
+      demo: !!config.demo,
       title: config.title || 'Passages ISS',
       visible_readable_entity: config.visible_readable_entity || '',
       visible_attrs_entity: config.visible_attrs_entity || '',
@@ -1292,7 +1302,7 @@ class GlossyIssPassesCard extends HTMLElement {
   _buildDom() {
     if (!this._w || !this._config) return;
     const cfg = this._config;
-    let html = `<div class="sec">${this._esc(cfg.title.toUpperCase())}</div>`;
+    let html = `<div class="sec">${this._esc(cfg.title.toUpperCase())}${cfg.demo ? ' · DÉMO' : ''}</div>`;
     let any = false;
     const live = this._live();
     if (live) html += `<div class="empty-state" id="live-msg" hidden></div>`;
@@ -1351,16 +1361,16 @@ class GlossyIssPassesCard extends HTMLElement {
     if (!this._h || !this._w) return;
     const cfg = this._config;
     if (this._live()) {
-      const msg = _issLive.problem(this._h), m = this._q('live-msg');
+      const oh = _issObsHass(this._h, cfg.demo), msg = _issLive.problem(oh), m = this._q('live-msg');
       if (m) { m.hidden = !msg; m.textContent = msg || ''; }
-      const nx = msg ? null : _issLive.next(this._h, cfg.min_elevation, 10, cfg.min_visible);
+      const nx = msg ? null : _issLive.next(oh, cfg.min_elevation, 10, cfg.min_visible);
       const esc = (v) => this._esc(v);
       const pv = this._q('pass-visible'), pg = this._q('pass-global');
       if (pv) pv.innerHTML = msg ? '' : _issLive.lines(nx && nx.visible, esc);
       if (pg) pg.innerHTML = msg ? '' : _issLive.lines(nx && nx.global, esc);
-      const d = _issLive.distance(this._h), nowEl = this._q('dist-now');
+      const d = _issLive.distance(oh), nowEl = this._q('dist-now');
       if (nowEl) nowEl.textContent = d === null ? '—' : Math.round(d).toLocaleString('fr-FR');
-      this._distHistory = _issLive.history(this._h, cfg.distance_hours);
+      this._distHistory = _issLive.history(oh, cfg.distance_hours);
       this._drawGraph();
       return;
     }
@@ -1485,6 +1495,7 @@ class GlossyIssPassesCardEditor extends HTMLElement {
       </style>
       <div class="wrap">
         ${_issThemeField(cfg.theme)}
+        ${_issDemoField(cfg.demo)}
         <div class="field"><label>Titre</label><input id="title" type="text" value="${this._esc(cfg.title)}"></div>
 
         <div class="hint">Laisser toutes les entités vides : passages et distance sont calculés par la carte, depuis la position de Home Assistant (options YAML min_elevation : hauteur minimale du passage, 10° par défaut ; min_visible : durée minimale à l'œil nu, 120 s par défaut).</div>
@@ -1528,7 +1539,7 @@ class GlossyIssPassesCardEditor extends HTMLElement {
       });
     });
 
-    _issBindTheme(this);
+    _issBindTheme(this); _issBindDemo(this);
     this._built = true;
   }
 
@@ -1638,6 +1649,7 @@ class GlossyIssTransitCard extends HTMLElement {
     config = config || {};
     this._config = {
       theme: config.theme || 'v2',
+      demo: !!config.demo,
       title: config.title || 'Transits ISS',
       solar_entity: config.solar_entity || '',
       lunar_entity: config.lunar_entity || '',
@@ -1709,13 +1721,13 @@ class GlossyIssTransitCard extends HTMLElement {
 
     if (!panels.length) {
       this._inn.innerHTML = `
-        <div class="sec">${this._esc(cfg.title.toUpperCase())}</div>
+        <div class="sec">${this._esc(cfg.title.toUpperCase())}${cfg.demo ? ' · DÉMO' : ''}</div>
         <div class="empty-state">Aucune entité configurée</div>`;
       return;
     }
 
     this._inn.innerHTML = `
-      <div class="sec">${this._esc(cfg.title.toUpperCase())}</div>
+      <div class="sec">${this._esc(cfg.title.toUpperCase())}${cfg.demo ? ' · DÉMO' : ''}</div>
       <div class="grid">
         ${panels.map(p => `
           <div class="panel" id="p-${p.kind}" style="--tc:${p.color}">
@@ -1779,9 +1791,9 @@ class GlossyIssTransitCard extends HTMLElement {
   _update() {
     if (!this._h) return;
     const live = this._live(), cfg = this._vcfg();
-    const vs = live ? _issTransit.states(this._h) : null;
+    const oh = _issObsHass(this._h, this._config.demo), vs = live ? _issTransit.states(oh) : null;
     const s = vs ? { ...this._h.states, ...vs } : this._h.states;
-    const msg = live ? _issLive.problem(this._h) : null;
+    const msg = live ? _issLive.problem(oh) : null;
 
     [
       { kind: 'solar', entity: cfg.solar_entity, showDistance: false },
@@ -1886,6 +1898,7 @@ class GlossyIssTransitCardEditor extends HTMLElement {
       </style>
       <div class="wrap">
         ${_issThemeField(cfg.theme)}
+        ${_issDemoField(cfg.demo)}
         <div class="field"><label>Titre</label><input id="title" type="text" value="${this._esc(cfg.title)}"></div>
         <div class="hint">Les deux entités sont facultatives : vides, les transits sont calculés par la carte (14 prochains jours).</div>
         <div class="field"><label>Entité transit solaire</label><ha-entity-picker id="solar_entity"></ha-entity-picker></div>
@@ -1913,7 +1926,7 @@ class GlossyIssTransitCardEditor extends HTMLElement {
       });
     });
 
-    _issBindTheme(this);
+    _issBindTheme(this); _issBindDemo(this);
     this._built = true;
   }
 
@@ -2285,14 +2298,14 @@ const _gsDuration=_issDuration;
 
 class GlossySpaceDashboardCard extends HTMLElement{
  constructor(){super();this.attachShadow({mode:'open'});this._ok=false;this._h=null;this._resize=null;this._history=null;this._historyAt=0}
- setConfig(c){c=c||{};this._config={theme:c.theme||'v2',title:c.title||'OPÉRATIONS SPATIALES',tracker:{...(c.tracker||{}),lat_entity:'',lon_entity:''},passes:{...(c.passes||{})},launch:{...(c.launch||{})},transits:{...(c.transits||{})}};this._fp=null;this._history=null;this._uz=null;this._follow=true;this._center=null;this._onZoom=()=>this._showZoom();if(this._ok){this._build();if(this._h)this.hass=this._h}}
+ setConfig(c){c=c||{};this._config={theme:c.theme||'v2',demo:!!c.demo,title:c.title||'OPÉRATIONS SPATIALES',tracker:{...(c.tracker||{}),lat_entity:'',lon_entity:''},passes:{...(c.passes||{})},launch:{...(c.launch||{})},transits:{...(c.transits||{})}};this._fp=null;this._history=null;this._uz=null;this._follow=true;this._center=null;this._onZoom=()=>this._showZoom();if(this._ok){this._build();if(this._h)this.hass=this._h}}
  getCardSize(){return 8}
  static getConfigElement(){return document.createElement('glossy-space-dashboard-card-editor')}
  static getStubConfig(){return {title:'OPÉRATIONS SPATIALES',tracker:{entity:''},passes:{},launch:{entity:''},transits:{}}}
  set hass(h){this._h=h;if(!this._config)return;_issTheme(this,this._config.theme,h);const t=this._config.tracker||{};let cleaned=false;for(const key of ['lat_entity','lon_entity']){if(t[key]&&!h.states[t[key]]){t[key]='';cleaned=true}}if(cleaned)this._config={...this._config,tracker:{...t}};if(!this._ok)this._init();const ids=this._ids();const fp=ids.map(id=>{const s=h.states[id];return id+'|'+(s?.state||'x')+'|'+JSON.stringify(s?.attributes||{})}).join('||');if(fp===this._fp)return;this._fp=fp;this._update()}
  _ids(){const c=this._config||{};return [c.tracker.entity,c.tracker.status_entity,c.passes.visible_readable_entity,c.passes.visible_attrs_entity,c.passes.global_readable_entity,c.passes.global_attrs_entity,c.passes.distance_entity,c.launch.entity,c.launch.mission_entity,c.launch.date_entity,c.launch.probability_entity,c.launch.status_entity,c.transits.solar_entity,c.transits.lunar_entity].filter(Boolean)}
  _init(){this._ok=true;const sh=this.shadowRoot;sh.innerHTML=`<style>${_GS_CSS}</style><div class="shell"><div class="top"><div class="brand"><ha-icon icon="mdi:satellite-variant"></ha-icon><strong id="title"></strong></div><span class="top-status" id="top-status">SYSTÈME PRÊT</span></div><div class="grid"><div class="left"><div class="panel" id="tracker-panel"></div><div class="panel" id="passes-panel"></div></div><div class="right"><div class="panel" id="launch-panel"></div><div class="panel" id="transits-panel"></div></div></div><div class="footer"><span>TÉLÉMÉTRIE SPATIALE EN DIRECT</span><span>HOME ASSISTANT</span></div></div>`;this._w=sh.querySelector('.shell');this._build();if(!this._tick)this._startTick()}
- _build(){if(!this._w)return;this._w.querySelector('#title').textContent=this._config.title;this._buildTracker();this._buildPasses();this._buildLaunch();this._buildTransits()}
+ _build(){if(!this._w)return;this._w.querySelector('#title').textContent=this._config.title;const ts=this._w.querySelector('#top-status');if(ts)ts.textContent=this._config.demo?'MODE DÉMO · LIEU FICTIF':'SYSTÈME PRÊT';this._buildTracker();this._buildPasses();this._buildLaunch();this._buildTransits()}
  _buildTracker(){const c=this._config.tracker||{};const el=this._w.querySelector('#tracker-panel');el.innerHTML='<div class="tracker-bar"><ha-icon icon="mdi:satellite-variant"></ha-icon><span>SUIVI DE L’ISS</span><span class="coords" id="tracker-coords">—</span></div><div class="map" id="map"><div class="map-empty">Position en attente…</div></div><div class="statline"><span>ÉTAT</span><b id="tracker-status">—</b><span>ZOOM <b id="tracker-zoom">—</b></span></div>';this._pos=null}
  _buildPasses(){const c=this._config.passes||{};const el=this._w.querySelector('#passes-panel');const live=this._passLive();let html='<div class="section-title">PASSAGES ISS</div>'+(live?'<div class="empty" id="live-msg" hidden></div>':'');if(live||c.visible_readable_entity)html+='<div class="pass" id="pass-visible"></div>';if(live||c.global_readable_entity)html+='<div class="pass" id="pass-global"></div>';if(live||c.distance_entity)html+='<div class="pass" id="distance-box"><div><span class="graph-now" id="distance-now">—</span><span class="graph-unit">km</span></div><svg class="graph" id="distance-graph" viewBox="0 0 300 55" preserveAspectRatio="none"></svg></div>';el.innerHTML=html}
  _passLive(){const c=this._config.passes||{};return !c.visible_readable_entity&&!c.global_readable_entity&&!c.distance_entity}
@@ -2303,11 +2316,11 @@ class GlossySpaceDashboardCard extends HTMLElement{
  _updateTracker(){const c=this._config.tracker||{},s=this._h.states,live=!c.entity?_issLive.position():null,main=c.entity?s[c.entity]:null,status=s[c.status_entity||c.entity],bad=c.entity?(!status||['unknown','unavailable'].includes(status.state)):!(live&&_issLive.fresh());if(!c.entity)_ISS.load();const lat0=live?live.lat:main?.attributes?.latitude,lon0=live?live.lon:main?.attributes?.longitude;const lat=Number(lat0),lon=Number(lon0),has=Number.isFinite(lat)&&Number.isFinite(lon)&&!(lat===0&&lon===0);const statusEl=this._w.querySelector('#tracker-status'),coordEl=this._w.querySelector('#tracker-coords');if(statusEl){statusEl.textContent=bad?'SIGNAL PERDU':'SIGNAL ACQUIS';statusEl.className=bad?'bad':'good'}if(coordEl)coordEl.textContent=has?_issCoords(lat,lon):'—';const zEl=this._w.querySelector('#tracker-zoom');if(zEl)zEl.textContent=String(Math.round(_issZ(this,c.zoom_span)));const map=this._w.querySelector('#map');if(!map||!has)return;const tile=_issTileUrl(c,_issLight(this)),kind=tile?'tiles':'vmap';this._pos={lat,lon,color:bad?'#ff4466':'#22dd88',tile};if(!map.querySelector('.'+kind)){if(kind==='tiles')_issDropVector(this);map.innerHTML=`<div class="${kind}"></div><div class="dot"></div>${_issZoomButtons}<div class="attr">${_issAttribution(c)}</div>`;_issBindZoom(this,map,()=>(this._config.tracker||{}).zoom_span,()=>{this._drawTiles();this._showZoom()});if(this._resize)this._resize.disconnect();this._resize=new ResizeObserver(()=>this._drawTiles());this._resize.observe(map)}this._drawTiles()}
  _showZoom(){const z=this._w&&this._w.querySelector('#tracker-zoom');if(z)z.textContent=String(Math.round(_issZ(this,(this._config.tracker||{}).zoom_span)))}
  _drawTiles(){const map=this._w&&this._w.querySelector('#map');if(map&&this._pos&&!this._pos.tile&&map.querySelector('.vmap')){map.querySelector('.dot')?.style.setProperty('--dc',this._pos.color);_issVector(this,map,this._pos.lat,this._pos.lon,_issZ(this,this._config.tracker.zoom_span),_issLight(this)).catch(e=>{_issDropVector(this);map.innerHTML=`<div class="map-empty">Carte indisponible : ${_gsEsc(e.message)}</div>`});return}if(!map||!this._pos)return;const p=this._pos,z=Math.round(Math.min(10,_issZ(this,this._config.tracker.zoom_span)));this._iss={lat:p.lat,lon:p.lon};this._rz=z;map.querySelector('.dot')?.style.setProperty('--dc',p.color);_issRaster(this,map,p.lat,p.lon,z,p.tile,()=>this._drawTiles())}
- _updatePasses(){const c=this._config.passes||{},s=this._h.states;if(this._passLive()){_ISS.load();const msg=_issLive.problem(this._h),m=this._w.querySelector('#live-msg');if(m){m.hidden=!msg;m.textContent=msg||''}const nx=msg?null:_issLive.next(this._h,c.min_elevation!=null?Number(c.min_elevation):10,10,c.min_visible!=null?Number(c.min_visible):120),pv=this._w.querySelector('#pass-visible'),pg=this._w.querySelector('#pass-global');if(pv)pv.innerHTML=msg?'':_issLive.lines(nx&&nx.visible,_gsEsc);if(pg)pg.innerHTML=msg?'':_issLive.lines(nx&&nx.global,_gsEsc);const d=_issLive.distance(this._h),dn=this._w.querySelector('#distance-now');if(dn)dn.textContent=d===null?'—':Math.round(d).toLocaleString('fr-FR');this._history=_issLive.history(this._h,c.distance_hours||12);this._drawHistory();return}const render=(id,readId,attrId)=>{const el=this._w.querySelector('#'+id);if(!el)return;const read=s[readId],a=s[attrId]?.attributes||{};let h=`<p><strong>Début :</strong> ${_gsEsc(read?.state||'—')}</p>`;if(a.duration!=null)h+=`<p><strong>Durée :</strong> ${_issDur(a.duration)}</p>`;if(a.maxEl!=null)h+=`<p><strong>Hauteur max :</strong> ${_gsEsc(_issNum(a.maxEl,1))}°</p>`;const path=[a.startAzCompass,a.maxAzCompass,a.endAzCompass].filter(Boolean).join(' → ');if(path)h+=`<p><strong>Trajet :</strong> ${_gsEsc(_issCardFr(path))}</p>`;el.innerHTML=h};render('pass-visible',c.visible_readable_entity,c.visible_attrs_entity);render('pass-global',c.global_readable_entity,c.global_attrs_entity);const st=s[c.distance_entity],now=this._w.querySelector('#distance-now');if(now&&st){const n=parseFloat(st.state);now.textContent=Number.isFinite(n)?Math.round(n).toLocaleString('fr-FR'):'—'}if(c.distance_entity)this._loadHistory()}
+ _updatePasses(){const c=this._config.passes||{},s=this._h.states;if(this._passLive()){_ISS.load();const oh=_issObsHass(this._h,this._config.demo),msg=_issLive.problem(oh),m=this._w.querySelector('#live-msg');if(m){m.hidden=!msg;m.textContent=msg||''}const nx=msg?null:_issLive.next(oh,c.min_elevation!=null?Number(c.min_elevation):10,10,c.min_visible!=null?Number(c.min_visible):120),pv=this._w.querySelector('#pass-visible'),pg=this._w.querySelector('#pass-global');if(pv)pv.innerHTML=msg?'':_issLive.lines(nx&&nx.visible,_gsEsc);if(pg)pg.innerHTML=msg?'':_issLive.lines(nx&&nx.global,_gsEsc);const d=_issLive.distance(oh),dn=this._w.querySelector('#distance-now');if(dn)dn.textContent=d===null?'—':Math.round(d).toLocaleString('fr-FR');this._history=_issLive.history(oh,c.distance_hours||12);this._drawHistory();return}const render=(id,readId,attrId)=>{const el=this._w.querySelector('#'+id);if(!el)return;const read=s[readId],a=s[attrId]?.attributes||{};let h=`<p><strong>Début :</strong> ${_gsEsc(read?.state||'—')}</p>`;if(a.duration!=null)h+=`<p><strong>Durée :</strong> ${_issDur(a.duration)}</p>`;if(a.maxEl!=null)h+=`<p><strong>Hauteur max :</strong> ${_gsEsc(_issNum(a.maxEl,1))}°</p>`;const path=[a.startAzCompass,a.maxAzCompass,a.endAzCompass].filter(Boolean).join(' → ');if(path)h+=`<p><strong>Trajet :</strong> ${_gsEsc(_issCardFr(path))}</p>`;el.innerHTML=h};render('pass-visible',c.visible_readable_entity,c.visible_attrs_entity);render('pass-global',c.global_readable_entity,c.global_attrs_entity);const st=s[c.distance_entity],now=this._w.querySelector('#distance-now');if(now&&st){const n=parseFloat(st.state);now.textContent=Number.isFinite(n)?Math.round(n).toLocaleString('fr-FR'):'—'}if(c.distance_entity)this._loadHistory()}
  async _loadHistory(){const c=this._config.passes||{};if(!this._h?.connection||!c.distance_entity)return;if(Date.now()-this._historyAt<300000&&this._history)return;this._historyAt=Date.now();try{const start=new Date(Date.now()-(c.distance_hours||12)*3600000).toISOString();const r=await this._h.connection.sendMessagePromise({type:'history/history_during_period',start_time:start,entity_ids:[c.distance_entity],minimal_response:true,no_attributes:true});this._history=(r?.[c.distance_entity]||[]).map(x=>parseFloat(x.s??x.state)).filter(Number.isFinite);this._drawHistory()}catch(e){console.warn('[glossy-space-dashboard-card] history unavailable',e)}}
  _drawHistory(){const svg=this._w.querySelector('#distance-graph'),v=this._history;if(!svg||!v||v.length<2)return;const min=Math.min(...v),range=Math.max(...v)-min||1,W=300,H=55,p=v.map((n,i)=>`${(i/(v.length-1)*W).toFixed(1)},${(H-5-((n-min)/range)*(H-10)).toFixed(1)}`).join(' ');svg.innerHTML=`<polygon points="0,${H} ${p} ${W},${H}" style="fill:color-mix(in srgb,var(--g-acc) 15%,transparent)"/><polyline points="${p}" fill="none" stroke-width="2" style="stroke:var(--g-acc)"/>`}
  _updateLaunch(){const live=!(this._config.launch||{}).entity,vs=live?_issLaunch.states():null;if(live)_issLaunch.load();const c=live?{...(this._config.launch||{}),..._issLaunch.VCFG}:this._config.launch||{},s=vs?{...this._h.states,...vs}:this._h.states;if(live&&!vs){const m=this._w.querySelector('#launch-mission');if(m)m.textContent=_issLaunch.failed?'Prochain lancement indisponible (Launch Library 2)':'Chargement du prochain lancement…';return}const main=s[c.entity],mission=s[c.mission_entity],date=s[c.date_entity],proba=s[c.probability_entity],status=s[c.status_entity];const q=id=>this._w.querySelector('#'+id);if(q('launch-provider'))q('launch-provider').textContent=main?.attributes?.provider||'—';if(q('launch-mission'))q('launch-mission').textContent=mission?.state||main?.state||'—';if(q('launch-date'))q('launch-date').textContent=date?.state?_gsDate(date.state):'—';{const m=(new Date(date?.state).getTime()-Date.now())/60000;this._w.querySelector('#launch-panel')?.classList.toggle('imminent',Number.isFinite(m)&&m>0&&m<(c.imminent_minutes??15))}if(q('launch-info')){const a=main?.attributes||{};q('launch-info').innerHTML=a.pad?`📍 <b>${_gsEsc(a.pad)}</b>${a.facility?`<br><small>${_gsEsc(a.facility)}</small>`:''}`:''}if(q('launch-stats')){const a=mission?.attributes||{};q('launch-stats').innerHTML=`<div><b>Météo</b><span>${proba?.state&&!['unknown','unavailable'].includes(proba.state)?_gsEsc(proba.state)+'%':'Pas de données'}</span></div><div><b>Lanceur</b><span>${_gsEsc(a.rocket_name||'—')}</span></div><div><b>Orbite</b><span>${_gsEsc(_issFr.orbit(a.target_orbit)||'—')}</span></div>${c.status_entity?`<div class="${/go/i.test(status?.state||'')?'good':'warn'}"><b>Statut</b><b>${_gsEsc(_issFr.status(status?.state)||'—')}</b></div>`:''}`}if(q('launch-desc'))q('launch-desc').textContent=_issFr.text(mission?.attributes?.description);if(!this._offFr)this._offFr=_issFr.onChange(()=>this._h&&this._updateLaunch())}
- _updateTransits(){const live=this._transLive(),c=live?{solar_entity:'iss.transit.solar',lunar_entity:'iss.transit.lunar'}:this._config.transits||{},vs=live?_issTransit.states(this._h):null,s=vs?{...this._h.states,...vs}:this._h.states,msg=live?_issLive.problem(this._h):null;for(const type of ['solar','lunar']){const body=this._w.querySelector('#transit-body-'+type),st=s[c[type+'_entity']];if(body&&msg){body.innerHTML=`<div class="empty">${_gsEsc(msg)}</div>`;continue}if(!body||!st)continue;const a=st.attributes||{},date=a.date;if(!date){body.innerHTML=`<div class="empty">Aucun transit prévu ${live?'dans les 14 prochains jours':"dans l'année"}.${a.closest_approach_deg!=null?`<br>Approche la plus proche : <b>${_issNum(a.closest_approach_deg,1)}°</b>`:''}</div>`;continue}body.innerHTML=`<div class="transit-date">${_gsEsc(_gsDate(date))}</div><span class="transit-count">${_gsEsc(_gsCountdown(date))}</span><div class="metrics"><div class="metric"><small>Durée</small><b>${_gsDuration(a.duration_seconds)}</b></div><div class="metric"><small>Hauteur</small><b>${a.max_elevation_deg!=null?_issNum(a.max_elevation_deg,1)+'°':'—'}</b></div>${type==='lunar'?`<div class="metric" style="grid-column:1/-1"><small>Distance ISS</small><b>${a.iss_distance_km!=null?Math.round(a.iss_distance_km).toLocaleString('fr-FR')+' km':'—'}</b></div>`:''}</div>`}}
+ _updateTransits(){const live=this._transLive(),c=live?{solar_entity:'iss.transit.solar',lunar_entity:'iss.transit.lunar'}:this._config.transits||{},oh=_issObsHass(this._h,this._config.demo),vs=live?_issTransit.states(oh):null,s=vs?{...this._h.states,...vs}:this._h.states,msg=live?_issLive.problem(oh):null;for(const type of ['solar','lunar']){const body=this._w.querySelector('#transit-body-'+type),st=s[c[type+'_entity']];if(body&&msg){body.innerHTML=`<div class="empty">${_gsEsc(msg)}</div>`;continue}if(!body||!st)continue;const a=st.attributes||{},date=a.date;if(!date){body.innerHTML=`<div class="empty">Aucun transit prévu ${live?'dans les 14 prochains jours':"dans l'année"}.${a.closest_approach_deg!=null?`<br>Approche la plus proche : <b>${_issNum(a.closest_approach_deg,1)}°</b>`:''}</div>`;continue}body.innerHTML=`<div class="transit-date">${_gsEsc(_gsDate(date))}</div><span class="transit-count">${_gsEsc(_gsCountdown(date))}</span><div class="metrics"><div class="metric"><small>Durée</small><b>${_gsDuration(a.duration_seconds)}</b></div><div class="metric"><small>Hauteur</small><b>${a.max_elevation_deg!=null?_issNum(a.max_elevation_deg,1)+'°':'—'}</b></div>${type==='lunar'?`<div class="metric" style="grid-column:1/-1"><small>Distance ISS</small><b>${a.iss_distance_km!=null?Math.round(a.iss_distance_km).toLocaleString('fr-FR')+' km':'—'}</b></div>`:''}</div>`}}
  _startTick(){if(this._tick)return;let n=0;this._tick=setInterval(()=>{if(!this._h)return;if(!(this._config.tracker||{}).entity)this._updateTracker();if(++n%6===0){this._updateLaunch();if(this._passLive())this._updatePasses();if(this._transLive())this._updateTransits()}},5000);const a=_ISS.onLoad(()=>this._h&&this._update()),b=_issLaunch.onLoad(()=>this._h&&this._updateLaunch());this._offLoad=()=>{a();b()}}
  connectedCallback(){if(this._ok&&!this._tick)this._startTick()}
  disconnectedCallback(){_issDropVector(this);const mv=this._w&&this._w.querySelector('#map .vmap');if(mv)mv.parentElement.innerHTML='';if(this._resize){this._resize.disconnect();this._resize=null}clearInterval(this._tick);this._tick=null;if(this._offLoad){this._offLoad();this._offLoad=null}}
@@ -2315,14 +2328,14 @@ class GlossySpaceDashboardCard extends HTMLElement{
 define('glossy-space-dashboard-card', GlossySpaceDashboardCard);
 
 class GlossySpaceDashboardCardEditor extends HTMLElement{
- setConfig(config){const c=config||{};this._config={type:'custom:glossy-space-dashboard-card',theme:c.theme||'v2',title:c.title||'OPÉRATIONS SPATIALES',tracker:{...(c.tracker||{}),lat_entity:'',lon_entity:''},passes:{...(c.passes||{})},launch:{...(c.launch||{})},transits:{...(c.transits||{})}};if(this._hass&&!this._built)this._render()}
+ setConfig(config){const c=config||{};this._config={type:'custom:glossy-space-dashboard-card',theme:c.theme||'v2',...(c.demo?{demo:true}:{}),title:c.title||'OPÉRATIONS SPATIALES',tracker:{...(c.tracker||{}),lat_entity:'',lon_entity:''},passes:{...(c.passes||{})},launch:{...(c.launch||{})},transits:{...(c.transits||{})}};if(this._hass&&!this._built)this._render()}
  set hass(hass){this._hass=hass;if(!this._built)this._render();else this._syncPickers()}
  connectedCallback(){if(this._config)this._render()}
  _emit(){this._config={...this._config,type:'custom:glossy-space-dashboard-card'};this.dispatchEvent(new CustomEvent('config-changed',{detail:{config:this._config},bubbles:true,composed:true}))}
  _esc(v){return (v??'').toString().replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
  _render(){if(!this._config||!this._hass)return;if(!this.shadowRoot)this.attachShadow({mode:'open'});const c=this._config,t=c.tracker||{},p=c.passes||{},l=c.launch||{},x=c.transits||{};this.shadowRoot.innerHTML=`<style>
   .wrap{padding:4px 0;font-family:var(--paper-font-body1_-_font-family,Arial,sans-serif)}.group{margin:16px 0 20px;padding:12px;border:1px solid var(--divider-color,#555);border-radius:10px}.group h3{margin:0 0 12px;font-size:13px;color:var(--primary-text-color,#eee)}.field{margin:0 0 11px}.field:last-child{margin-bottom:0}label{display:block;margin:0 0 4px;font-size:12px;color:var(--secondary-text-color,#999)}input{width:100%;box-sizing:border-box;padding:8px;border:1px solid var(--divider-color,#555);border-radius:6px;background:var(--card-background-color,#1c1c1c);color:var(--primary-text-color,#eee)}.hint{font-size:11px;line-height:1.4;color:var(--secondary-text-color,#888);margin-top:-4px;margin-bottom:12px}
- </style><div class="wrap">${_issThemeField(c.theme)}<div class="field"><label>Titre du tableau de bord</label><input id="title" value="${this._esc(c.title)}"></div>
+ </style><div class="wrap">${_issThemeField(c.theme)}${_issDemoField(c.demo)}<div class="field"><label>Titre du tableau de bord</label><input id="title" value="${this._esc(c.title)}"></div>
  <div class="group"><h3>Suivi de l’ISS</h3><div class="field"><label>Entité position (latitude / longitude) — vide : position calculée</label><ha-entity-picker id="tracker.entity"></ha-entity-picker></div><div class="field"><label>Entité statut</label><ha-entity-picker id="tracker.status_entity"></ha-entity-picker></div><div class="field"><label>Largeur de vue carte (degrés)</label><input id="tracker.zoom_span" type="number" value="${this._esc(t.zoom_span??40)}"></div><div class="field"><label>Clé Stadia Maps (facultative)</label><input id="tracker.stadia_api_key" type="text" value="${this._esc(t.stadia_api_key||'')}"></div><div class="field"><label>Clé CARTO (facultative)</label><input id="tracker.carto_api_key" type="text" value="${this._esc(t.carto_api_key||'')}"></div><div class="hint">Sans clé : fond vectoriel OpenFreeMap. Clé Stadia Maps ou CARTO facultative.</div></div>
  <div class="group"><h3>Passages ISS</h3><div class="hint">Toutes les entités vides : passages et distance calculés par la carte, depuis la position de Home Assistant.</div><div class="field"><label>Passage visible — texte</label><ha-entity-picker id="passes.visible_readable_entity"></ha-entity-picker></div><div class="field"><label>Passage visible — attributs</label><ha-entity-picker id="passes.visible_attrs_entity"></ha-entity-picker></div><div class="field"><label>Passage global — texte</label><ha-entity-picker id="passes.global_readable_entity"></ha-entity-picker></div><div class="field"><label>Passage global — attributs</label><ha-entity-picker id="passes.global_attrs_entity"></ha-entity-picker></div><div class="field"><label>Distance ISS</label><ha-entity-picker id="passes.distance_entity"></ha-entity-picker></div><div class="field"><label>Historique distance (heures)</label><input id="passes.distance_hours" type="number" value="${this._esc(p.distance_hours??12)}"></div></div>
  <div class="group"><h3>Prochain lancement</h3><div class="field"><label>Entité principale — vide : Launch Library 2</label><ha-entity-picker id="launch.entity"></ha-entity-picker></div><div class="field"><label>Mission</label><ha-entity-picker id="launch.mission_entity"></ha-entity-picker></div><div class="field"><label>Date de lancement</label><ha-entity-picker id="launch.date_entity"></ha-entity-picker></div><div class="field"><label>Probabilité météo</label><ha-entity-picker id="launch.probability_entity"></ha-entity-picker></div><div class="field"><label>Statut du lancement</label><ha-entity-picker id="launch.status_entity"></ha-entity-picker></div><div class="field"><label>Seuil imminent (minutes)</label><input id="launch.imminent_minutes" type="number" value="${this._esc(l.imminent_minutes??15)}"></div></div>
@@ -2330,7 +2343,7 @@ class GlossySpaceDashboardCardEditor extends HTMLElement{
  const paths=['tracker.entity','tracker.status_entity','passes.visible_readable_entity','passes.visible_attrs_entity','passes.global_readable_entity','passes.global_attrs_entity','passes.distance_entity','launch.entity','launch.mission_entity','launch.date_entity','launch.probability_entity','launch.status_entity','transits.solar_entity','transits.lunar_entity'];
  const get=(path)=>path.split('.').reduce((o,k)=>o?.[k],this._config)||'';const set=(path,value)=>{const [section,key]=path.split('.');this._config={...this._config,[section]:{...(this._config[section]||{}),[key]:value}};this._emit()};
  paths.forEach(path=>{const picker=this.shadowRoot.getElementById(path);if(!picker)return;picker.hass=this._hass;picker.includeDomains=['sensor'];picker.value=get(path);picker.addEventListener('value-changed',e=>{e.stopPropagation();set(path,e.detail.value)})});
- const bind=(id,path,number=false)=>{const el=this.shadowRoot.getElementById(id);if(!el)return;el.addEventListener('input',e=>{const value=number?(parseFloat(e.target.value)||0):e.target.value;if(path==='title')this._config={...this._config,title:value};else{const [section,key]=path.split('.');this._config={...this._config,[section]:{...(this._config[section]||{}),[key]:value}}}this._emit()})};bind('title','title');bind('tracker.zoom_span','tracker.zoom_span',true);bind('tracker.stadia_api_key','tracker.stadia_api_key');bind('tracker.carto_api_key','tracker.carto_api_key');bind('passes.distance_hours','passes.distance_hours',true);bind('launch.imminent_minutes','launch.imminent_minutes',true);_issBindTheme(this);this._built=true
+ const bind=(id,path,number=false)=>{const el=this.shadowRoot.getElementById(id);if(!el)return;el.addEventListener('input',e=>{const value=number?(parseFloat(e.target.value)||0):e.target.value;if(path==='title')this._config={...this._config,title:value};else{const [section,key]=path.split('.');this._config={...this._config,[section]:{...(this._config[section]||{}),[key]:value}}}this._emit()})};bind('title','title');bind('tracker.zoom_span','tracker.zoom_span',true);bind('tracker.stadia_api_key','tracker.stadia_api_key');bind('tracker.carto_api_key','tracker.carto_api_key');bind('passes.distance_hours','passes.distance_hours',true);bind('launch.imminent_minutes','launch.imminent_minutes',true);_issBindTheme(this);_issBindDemo(this);this._built=true
  }
  _syncPickers(){if(!this.shadowRoot)return;this.shadowRoot.querySelectorAll('ha-entity-picker').forEach(p=>{p.hass=this._hass})}
 }
