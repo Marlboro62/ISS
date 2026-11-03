@@ -28,7 +28,7 @@
 
 # Cartes ISS et espace
 
-**Cinq cartes Lovelace dans un seul fichier**, au style HC3 Fibaro Glossy (fond noir, orange, police Orbitron) :
+**Cinq cartes Lovelace dans un seul fichier**, aux couleurs des autres cartes ([Météo](https://github.com/Marlboro62/meteo-card), [Carte Enedis Linky New](https://github.com/Marlboro62/content-card-linky-new)…) : bleu nuit par défaut, version claire, thème Home Assistant, ou **Glossy HC3 Fibaro** (fond noir, orange, police Orbitron) :
 
 | Type | Carte |
 | --- | --- |
@@ -39,6 +39,15 @@
 | `custom:glossy-launch-card` | **Prochain lancement** : agence, mission, date (rouge clignotant juste avant le décollage), pas de tir, météo, lanceur, orbite, statut |
 
 Les cartes lisent des **capteurs Home Assistant** : chacune n'affiche que les parties dont le capteur est configuré. Toutes ont un **éditeur visuel**.
+
+Option commune à toutes les cartes, `theme` (« Couleurs de la carte » dans l'éditeur) :
+
+| Valeur | Couleurs |
+| --- | --- |
+| `v2` (défaut) | Bleu nuit, comme les autres cartes |
+| `auto` | Bleu nuit, ou version claire quand Home Assistant est en mode clair |
+| `ha` | Couleurs du thème Home Assistant (clair ou sombre) |
+| `glossy` | Glossy HC3 Fibaro : fond noir, orange, police Orbitron |
 
 ![Space Operations](https://raw.githubusercontent.com/Marlboro62/ISS/main/images/tableau-de-bord.png)
 
@@ -85,7 +94,7 @@ transits:
   lunar_entity: sensor.iss_next_lunar_transit
 ```
 
-Les sections `tracker`, `passes`, `launch` et `transits` prennent les mêmes options que les cartes séparées, décrites ci-dessous. `title` change le titre du bandeau.
+Les sections `tracker`, `passes`, `launch` et `transits` prennent les mêmes options que les cartes séparées, décrites ci-dessous. `title` change le titre du bandeau, `theme` les couleurs de tout le tableau de bord.
 
 ## ISS Tracker — `custom:glossy-iss-tracker-card`
 

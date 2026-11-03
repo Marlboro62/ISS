@@ -10,11 +10,61 @@
  *   custom:glossy-space-dashboard-card  les quatre en un seul tableau de bord
  */
 
-const CARD_VERSION = "0.2.0-beta.1";
+const CARD_VERSION = "0.3.0-beta.1";
 
 // Enregistrement sans erreur si une ancienne copie de la carte est encore
 // chargée comme ressource à côté de celle de HACS.
 const define = (name, cls) => { if (!customElements.get(name)) customElements.define(name, cls); };
+
+// ── Couleurs : variables partagées par les cinq cartes ──
+// v2 (défaut) : bleu nuit des autres cartes (MyElectricalData, Météo, Serveur HA…)
+// light : version claire (thème « auto » quand Home Assistant est en clair)
+// ha : couleurs du thème Home Assistant ; glossy : orange HC3 Fibaro d'origine
+const _ISS_THEME_CSS = `
+:host{
+  --g-bg:#1a2434;--g-deep:#131c2a;--g-panel:#212d40;--g-grad:#1a2434;
+  --g-acc:#1d93e3;--g-acc2:#7cc4ff;--g-edge:#5b7fb0;--g-text:#e7edf5;--g-muted:#b4c3d8;
+  --g-font:var(--ha-font-family-body,var(--paper-font-body1_-_font-family,Roboto,'Noto',sans-serif));
+  --g-font-t:var(--g-font);--g-font-m:var(--code-font-family,ui-monospace,monospace);
+}
+:host([data-theme="light"]){
+  --g-bg:#ffffff;--g-deep:#eef2f7;--g-panel:#f2f5f9;--g-grad:#ffffff;
+  --g-acc:#1673b8;--g-acc2:#1673b8;--g-edge:#9fb3cc;--g-text:#1a2434;--g-muted:#5b6b82;
+}
+:host([data-theme="ha"]){
+  --g-bg:var(--ha-card-background,var(--card-background-color,#fff));
+  --g-deep:color-mix(in srgb,var(--primary-text-color,#000) 7%,var(--g-bg));
+  --g-panel:color-mix(in srgb,var(--primary-text-color,#000) 4%,var(--g-bg));--g-grad:var(--g-bg);
+  --g-acc:var(--primary-color,#03a9f4);--g-acc2:var(--primary-color,#03a9f4);--g-edge:var(--primary-color,#03a9f4);
+  --g-text:var(--primary-text-color,#212121);--g-muted:var(--primary-text-color,#212121);
+}
+:host([data-theme="glossy"]){
+  --g-bg:#1a1a1a;--g-deep:#0e0e0e;--g-panel:rgba(28,28,28,.96);
+  --g-grad:linear-gradient(175deg,#1e1e1e 0%,#141414 55%,#0f0f0f 100%);
+  --g-acc:#e6750a;--g-acc2:#ffc06a;--g-edge:#e6750a;--g-text:#f2f2f2;--g-muted:#d2b48c;
+  --g-font:'Rajdhani','Nunito',sans-serif;--g-font-t:'Orbitron',monospace;--g-font-m:'DM Mono',monospace;
+}
+`;
+/** Applique le thème choisi (et le mode clair de Home Assistant pour « auto »). */
+const _issTheme = (el, theme, hass) => {
+  const t = theme || 'v2', light = hass?.themes?.darkMode === false;
+  const mode = t === 'glossy' ? 'glossy' : t === 'ha' ? 'ha' : t === 'auto' && light ? 'light' : 'v2';
+  if (el.getAttribute('data-theme') === mode) return;
+  el.setAttribute('data-theme', mode);
+  if (el._reTheme) el._reTheme();
+};
+const _ISS_THEMES = [
+  ['v2', 'Style MyElectricalData (bleu nuit)'],
+  ['auto', 'Style MyElectricalData, clair ou sombre selon Home Assistant'],
+  ['ha', 'Thème Home Assistant (clair ou sombre)'],
+  ['glossy', 'Glossy HC3 Fibaro (orange)'],
+];
+/** Liste « Couleurs de la carte » dans un éditeur (champ <select id="theme">). */
+const _issThemeField = (cur) => `<div class="field"><label>Couleurs de la carte</label><select id="theme" style="width:100%;box-sizing:border-box;padding:7px 8px;border-radius:6px;border:1px solid var(--divider-color,#555);background:var(--card-background-color,#1c1c1c);color:var(--primary-text-color,#eee);font-size:13px;">${_ISS_THEMES.map(([v, l]) => `<option value="${v}"${(cur || 'v2') === v ? ' selected' : ''}>${l}</option>`).join('')}</select></div>`;
+const _issBindTheme = (ed) => {
+  const sel = ed.shadowRoot && ed.shadowRoot.getElementById('theme');
+  if (sel) sel.addEventListener('change', (e) => { ed._config = { ...ed._config, theme: e.target.value }; ed._emit(); });
+};
 
 /**
  * GLOSSY ISS TRACKER CARD — Position de l'ISS + petite carte
@@ -40,25 +90,25 @@ const define = (name, cls) => { if (!customElements.get(name)) customElements.de
  * appropriés (cf. osm.wiki/Blocked), donc pas de repli automatique dessus.
  */
 
-const _IS_CSS = `
+const _IS_CSS = _ISS_THEME_CSS + `
   :host{
     --ok:#22dd88;--err:#ff4466;
-    font-family:'Rajdhani','Nunito',sans-serif;
+    font-family:var(--g-font);
     font-size:16px;display:block;
   }
   *{box-sizing:border-box;}
   @keyframes is-blink{0%,100%{opacity:1;}50%{opacity:.4;}}
 
   .w{
-    background:linear-gradient(175deg,#1e1e1e 0%,#141414 55%,#0f0f0f 100%);
-    border-radius:16px;border:1px solid rgba(230,117,10,0.14);
+    background:var(--g-grad);
+    border-radius:16px;border:1px solid color-mix(in srgb,var(--g-edge) 14%,transparent);
     padding:8px;
   }
 
   .bar{
     display:flex;align-items:center;gap:10px;
-    background:linear-gradient(175deg,#1e1e1e 0%,#141414 55%,#0f0f0f 100%);
-    border:1px solid rgba(230,117,10,0.22);border-top:2px solid rgba(230,117,10,0.6);
+    background:var(--g-grad);
+    border:1px solid color-mix(in srgb,var(--g-edge) 22%,transparent);border-top:2px solid color-mix(in srgb,var(--g-acc) 60%,transparent);
     border-radius:12px;box-shadow:inset 0 1px 0 rgba(255,255,255,0.05);
     padding:0 12px;height:40px;margin-bottom:8px;
   }
@@ -66,14 +116,14 @@ const _IS_CSS = `
   .bar ha-icon.ok{color:var(--ok);}
   .bar ha-icon.err{color:var(--err);animation:is-blink 2s ease-in-out infinite;}
   .bar-name{
-    font-family:'Orbitron',monospace;font-weight:700;font-size:13px;letter-spacing:1px;
-    color:#ffc06a;flex-shrink:0;
+    font-family:var(--g-font-t);font-weight:700;font-size:13px;letter-spacing:1px;
+    color:var(--g-acc2);flex-shrink:0;
   }
   .bar-coords{font-size:14px;transition:color .3s ease;}
   .bar-coords.ok{color:var(--ok);}
   .bar-coords.err{color:var(--err);animation:is-blink 2s ease-in-out infinite;}
 
-  .map-wrap{position:relative;width:100%;height:230px;border-radius:12px;overflow:hidden;background:#0e0e0e;}
+  .map-wrap{position:relative;width:100%;height:230px;border-radius:12px;overflow:hidden;background:var(--g-deep);}
   .tiles{position:absolute;inset:0;}
   .tiles img{position:absolute;width:256px;height:256px;max-width:none;user-select:none;pointer-events:none;}
   .dot{
@@ -81,13 +131,13 @@ const _IS_CSS = `
     background:var(--dc);border:2px solid var(--dc);box-shadow:0 0 0 4px color-mix(in srgb,var(--dc) 25%,transparent),0 0 14px var(--dc);
   }
   .attr{
-    position:absolute;right:6px;bottom:4px;font-size:9px;color:rgba(210,180,140,0.6);
-    background:rgba(14,14,14,0.6);padding:1px 5px;border-radius:4px;
+    position:absolute;right:6px;bottom:4px;font-size:9px;color:color-mix(in srgb,var(--g-muted) 60%,transparent);
+    background:color-mix(in srgb,var(--g-deep) 60%,transparent);padding:1px 5px;border-radius:4px;
   }
   .attr a{color:inherit;text-decoration:none;}
   .map-empty{
     display:flex;align-items:center;justify-content:center;height:100%;
-    color:rgba(210,180,140,0.52);font-size:0.85rem;text-align:center;padding:0 20px;
+    color:color-mix(in srgb,var(--g-muted) 52%,transparent);font-size:0.85rem;text-align:center;padding:0 20px;
   }
 `;
 
@@ -132,6 +182,7 @@ class GlossyIssTrackerCard extends HTMLElement {
   setConfig(config) {
     config = config || {};
     this._config = {
+      theme: config.theme || 'v2',
       entity: config.entity || '',
       status_entity: config.status_entity || config.entity || '',
       lat_entity: config.lat_entity || '',
@@ -154,6 +205,7 @@ class GlossyIssTrackerCard extends HTMLElement {
   set hass(h) {
     this._h = h;
     if (!this._config) return; // hass peut arriver avant setConfig()
+    _issTheme(this, this._config.theme, h);
     if (!this._ok) this._init();
     const ents = [this._config.entity, this._config.status_entity, this._config.lat_entity, this._config.lon_entity].filter(Boolean);
     const fp = ents.map(e => h.states[e]?.state || 'x').join('|')
@@ -233,7 +285,7 @@ class GlossyIssTrackerCard extends HTMLElement {
     }
     const tileUrl = _issTileUrl(this._config);
     if (!tileUrl) {
-      mapWrap.innerHTML = `<div class="map-empty"><span>Carte désactivée : configure une clé gratuite <a href="https://client.stadiamaps.com/" target="_blank" rel="noopener" style="color:#ffc06a;">Stadia Maps</a> ou <a href="https://carto.com/basemaps/apikey" target="_blank" rel="noopener" style="color:#ffc06a;">CARTO</a> dans l'éditeur de la carte.</span></div>`;
+      mapWrap.innerHTML = `<div class="map-empty"><span>Carte désactivée : configure une clé gratuite <a href="https://client.stadiamaps.com/" target="_blank" rel="noopener" style="color:var(--g-acc2);">Stadia Maps</a> ou <a href="https://carto.com/basemaps/apikey" target="_blank" rel="noopener" style="color:var(--g-acc2);">CARTO</a> dans l'éditeur de la carte.</span></div>`;
       return;
     }
 
@@ -326,6 +378,7 @@ class GlossyIssTrackerCardEditor extends HTMLElement {
         .hint{font-size:11px;color:var(--secondary-text-color,#888);margin:-6px 0 12px;}
       </style>
       <div class="wrap">
+        ${_issThemeField(cfg.theme)}
         <div class="field"><label>Entité position (attributs latitude/longitude)</label><ha-entity-picker id="entity"></ha-entity-picker></div>
         <div class="field"><label>Entité de statut (optionnel — vert/rouge)</label><ha-entity-picker id="status_entity"></ha-entity-picker></div>
         <div class="hint">Laisser vide utilise l'entité position elle-même pour déterminer si le signal est perdu.</div>
@@ -366,6 +419,7 @@ class GlossyIssTrackerCardEditor extends HTMLElement {
       this._emit();
     });
 
+    _issBindTheme(this);
     this._built = true;
   }
 
@@ -394,18 +448,18 @@ define('glossy-iss-tracker-card-editor', GlossyIssTrackerCardEditor);
  *   distance_hours: 12                       # optionnel — fenêtre d'historique (défaut 12h)
  */
 
-const _IP_CSS = `
+const _IP_CSS = _ISS_THEME_CSS + `
   :host{
-    --c1:#e6750a;--c4:#ffc06a;
-    font-family:'Rajdhani','Nunito',sans-serif;
+    --c1:var(--g-acc);--c4:var(--g-acc2);
+    font-family:var(--g-font);
     font-size:16px;display:block;
   }
   *{box-sizing:border-box;}
 
   .w{
     position:relative;overflow:hidden;
-    background:linear-gradient(175deg,#1e1e1e 0%,#141414 55%,#0f0f0f 100%);
-    border-radius:16px;border:1px solid rgba(230,117,10,0.22);
+    background:var(--g-grad);
+    border-radius:16px;border:1px solid color-mix(in srgb,var(--g-edge) 22%,transparent);
     box-shadow:inset 0 1px 0 rgba(255,255,255,0.06),0 8px 28px rgba(0,0,0,0.65);
     padding:18px;
   }
@@ -415,23 +469,23 @@ const _IP_CSS = `
   }
 
   .sec{
-    font-family:'Orbitron',monospace;font-size:0.82rem;font-weight:600;
-    letter-spacing:2px;color:rgba(230,117,10,0.85);text-transform:uppercase;
+    font-family:var(--g-font-t);font-size:0.82rem;font-weight:600;
+    letter-spacing:2px;color:color-mix(in srgb,var(--g-acc) 85%,transparent);text-transform:uppercase;
     margin-bottom:12px;display:flex;align-items:center;gap:8px;
-    border-bottom:1px solid rgba(230,117,10,0.25);padding-bottom:6px;
+    border-bottom:1px solid color-mix(in srgb,var(--g-edge) 25%,transparent);padding-bottom:6px;
   }
   .sec.spaced{margin-top:18px;}
 
   .pass{margin-bottom:4px;}
-  .pass p{color:rgba(210,180,140,0.75);font-size:0.95rem;line-height:1.7;margin:0;}
-  .pass strong{color:#ffc06a;font-weight:700;}
+  .pass p{color:color-mix(in srgb,var(--g-muted) 75%,transparent);font-size:0.95rem;line-height:1.7;margin:0;}
+  .pass strong{color:var(--g-acc2);font-weight:700;}
 
   .graph-wrap{margin-top:6px;}
-  .graph-now{font-family:'Orbitron',monospace;font-size:1.3rem;font-weight:800;color:#f2f2f2;}
-  .graph-unit{font-size:0.72rem;color:rgba(210,180,140,0.55);margin-left:4px;}
+  .graph-now{font-family:var(--g-font-t);font-size:1.3rem;font-weight:800;color:var(--g-text);}
+  .graph-unit{font-size:0.72rem;color:color-mix(in srgb,var(--g-muted) 55%,transparent);margin-left:4px;}
   svg{width:100%;height:70px;display:block;margin-top:6px;}
 
-  .empty-state{text-align:center;padding:20px 12px;color:rgba(210,180,140,0.52);font-size:0.85rem;}
+  .empty-state{text-align:center;padding:20px 12px;color:color-mix(in srgb,var(--g-muted) 52%,transparent);font-size:0.85rem;}
 `;
 
 class GlossyIssPassesCard extends HTMLElement {
@@ -448,6 +502,7 @@ class GlossyIssPassesCard extends HTMLElement {
   setConfig(config) {
     config = config || {};
     this._config = {
+      theme: config.theme || 'v2',
       title: config.title || 'Passages ISS',
       visible_readable_entity: config.visible_readable_entity || '',
       visible_attrs_entity: config.visible_attrs_entity || '',
@@ -475,6 +530,7 @@ class GlossyIssPassesCard extends HTMLElement {
   set hass(h) {
     this._h = h;
     if (!this._config) return; // hass peut arriver avant setConfig()
+    _issTheme(this, this._config.theme, h);
     if (!this._ok) this._init();
     const ents = [
       this._config.visible_readable_entity, this._config.visible_attrs_entity,
@@ -623,8 +679,8 @@ class GlossyIssPassesCard extends HTMLElement {
     const line = pts.join(' ');
     const fill = `0,${H} ${line} ${W},${H}`;
     svg.innerHTML = `
-      <polygon points="${fill}" fill="rgba(230,117,10,0.15)"></polygon>
-      <polyline points="${line}" fill="none" stroke="#ff8c33" stroke-width="2"></polyline>
+      <polygon points="${fill}" style="fill:color-mix(in srgb,var(--g-acc) 15%,transparent)"></polygon>
+      <polyline points="${line}" fill="none" stroke-width="2" style="stroke:var(--g-acc)"></polyline>
     `;
   }
 }
@@ -690,6 +746,7 @@ class GlossyIssPassesCardEditor extends HTMLElement {
         .hint{font-size:11px;color:var(--secondary-text-color,#888);margin:-6px 0 12px;}
       </style>
       <div class="wrap">
+        ${_issThemeField(cfg.theme)}
         <div class="field"><label>Titre</label><input id="title" type="text" value="${this._esc(cfg.title)}"></div>
 
         <h4>Prochain passage visible</h4>
@@ -732,6 +789,7 @@ class GlossyIssPassesCardEditor extends HTMLElement {
       });
     });
 
+    _issBindTheme(this);
     this._built = true;
   }
 
@@ -760,13 +818,13 @@ define('glossy-iss-passes-card-editor', GlossyIssPassesCardEditor);
  *   lunar_entity: sensor.iss_next_lunar_transit
  */
 
-const _IT_CSS = `
+const _IT_CSS = _ISS_THEME_CSS + `
   :host{
-    --c1:#e6750a;--c4:#ffc06a;--c5:#4caf50;
+    --c1:var(--g-acc);--c4:var(--g-acc2);--c5:#4caf50;
     --sun:#ffc857;--moon:#8ab4ff;
-    --bg:#1a1a1a;--panel:rgba(28,28,28,0.96);
-    --border:rgba(230,117,10,0.22);--muted:rgba(210,180,140,0.52);
-    font-family:'Rajdhani','Nunito',sans-serif;
+    --bg:var(--g-bg);--panel:var(--g-panel);
+    --border:color-mix(in srgb,var(--g-edge) 22%,transparent);--muted:color-mix(in srgb,var(--g-muted) 52%,transparent);
+    font-family:var(--g-font);
     font-size:16px;display:block;
   }
   *{box-sizing:border-box;}
@@ -774,7 +832,7 @@ const _IT_CSS = `
   .cv{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:0;}
   .in{position:relative;z-index:1;}
   .sec{
-    font-family:'Orbitron',monospace;font-size:0.82rem;font-weight:600;
+    font-family:var(--g-font-t);font-size:0.82rem;font-weight:600;
     letter-spacing:2px;color:var(--muted);text-transform:uppercase;
     margin-bottom:14px;display:flex;align-items:center;gap:8px;
   }
@@ -793,11 +851,11 @@ const _IT_CSS = `
   }
   .p-head{display:flex;align-items:center;gap:9px;margin-bottom:12px;}
   .p-ico{font-size:1.4rem;}
-  .p-title{font-family:'Orbitron',monospace;font-size:0.74rem;font-weight:700;letter-spacing:1px;color:var(--tc);text-transform:uppercase;}
+  .p-title{font-family:var(--g-font-t);font-size:0.74rem;font-weight:700;letter-spacing:1px;color:var(--tc);text-transform:uppercase;}
 
   .p-empty{font-size:0.82rem;color:var(--muted);line-height:1.5;padding:6px 0 2px;}
 
-  .p-date{font-family:'Orbitron',monospace;font-size:1.15rem;font-weight:800;color:#f2f2f2;line-height:1.3;}
+  .p-date{font-family:var(--g-font-t);font-size:1.15rem;font-weight:800;color:var(--g-text);line-height:1.3;}
   .p-countdown{
     display:inline-flex;align-items:center;gap:5px;margin-top:7px;
     font-size:0.74rem;font-weight:700;color:var(--tc);
@@ -812,7 +870,7 @@ const _IT_CSS = `
   }
   .mii{font-size:1rem;margin-bottom:3px;}
   .mil{font-size:0.62rem;letter-spacing:.3px;color:var(--muted);text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:3px;}
-  .miv{font-family:'Orbitron',monospace;font-size:0.85rem;font-weight:700;line-height:1;color:#f2f2f2;}
+  .miv{font-family:var(--g-font-t);font-size:0.85rem;font-weight:700;line-height:1;color:var(--g-text);}
 
   .empty-state{text-align:center;padding:26px 12px;color:var(--muted);font-size:0.85rem;}
 `;
@@ -859,6 +917,7 @@ class GlossyIssTransitCard extends HTMLElement {
   setConfig(config) {
     config = config || {};
     this._config = {
+      theme: config.theme || 'v2',
       title: config.title || 'Transits ISS',
       solar_entity: config.solar_entity || '',
       lunar_entity: config.lunar_entity || '',
@@ -877,6 +936,7 @@ class GlossyIssTransitCard extends HTMLElement {
   set hass(h) {
     this._h = h;
     if (!this._config) return; // hass peut arriver avant setConfig()
+    _issTheme(this, this._config.theme, h);
     if (!this._ok) this._init();
     const ents = [this._config.solar_entity, this._config.lunar_entity].filter(Boolean);
     const fp = ents.map(e => {
@@ -944,8 +1004,11 @@ class GlossyIssTransitCard extends HTMLElement {
 
   _particles(cv, w) {
     const cx = cv.getContext('2d'); let W, H, S = [];
-    const P = ['#e6750a', '#f09a3e', '#ffc06a'], L = 'rgba(230,117,10,0.07)';
+    let P = [], L = '';
     const ri = () => {
+      const g = getComputedStyle(this);
+      P = [g.getPropertyValue('--g-acc').trim() || '#1d93e3', g.getPropertyValue('--g-acc2').trim() || '#7cc4ff'];
+      L = P[0];
       const r = w.getBoundingClientRect();
       W = cv.width = r.width || 400; H = cv.height = r.height || 300;
       const n = Math.min(80, Math.floor(H / 6)); S = [];
@@ -973,11 +1036,12 @@ class GlossyIssTransitCard extends HTMLElement {
         const dx = S[i].x - S[j].x, dy = S[i].y - S[j].y;
         if (dx * dx + dy * dy < 6000) {
           cx.beginPath(); cx.moveTo(S[i].x, S[i].y); cx.lineTo(S[j].x, S[j].y);
-          cx.strokeStyle = L; cx.lineWidth = .4; cx.stroke();
+          cx.globalAlpha = .07; cx.strokeStyle = L; cx.lineWidth = .4; cx.stroke(); cx.globalAlpha = 1;
         }
       }
       requestAnimationFrame(dr);
     };
+    this._reTheme = ri;
     new ResizeObserver(ri).observe(w); ri(); dr();
   }
 
@@ -1090,6 +1154,7 @@ class GlossyIssTransitCardEditor extends HTMLElement {
         .hint{font-size:11px;color:var(--secondary-text-color,#888);margin:-6px 0 12px;}
       </style>
       <div class="wrap">
+        ${_issThemeField(cfg.theme)}
         <div class="field"><label>Titre</label><input id="title" type="text" value="${this._esc(cfg.title)}"></div>
         <div class="hint">Les deux entités sont optionnelles, mais il en faut au moins une pour que la carte affiche quelque chose.</div>
         <div class="field"><label>Entité transit solaire</label><ha-entity-picker id="solar_entity"></ha-entity-picker></div>
@@ -1117,6 +1182,7 @@ class GlossyIssTransitCardEditor extends HTMLElement {
       });
     });
 
+    _issBindTheme(this);
     this._built = true;
   }
 
@@ -1146,11 +1212,11 @@ define('glossy-iss-transit-card-editor', GlossyIssTransitCardEditor);
  *   imminent_minutes: 15   # optionnel — glow rouge clignotant sous ce seuil (défaut 15)
  */
 
-const _LC_CSS = `
+const _LC_CSS = _ISS_THEME_CSS + `
   :host{
-    --c1:#e6750a;--c4:#ffc06a;--ok:#22dd88;--err:#ff4466;
-    --bg:#1a1a1a;
-    font-family:'Rajdhani','Nunito',sans-serif;
+    --c1:var(--g-acc);--c4:var(--g-acc2);--ok:#22dd88;--err:#ff4466;
+    --bg:var(--g-bg);
+    font-family:var(--g-font);
     font-size:16px;display:block;
   }
   *{box-sizing:border-box;}
@@ -1158,9 +1224,9 @@ const _LC_CSS = `
 
   .w{
     position:relative;border-radius:16px;overflow:hidden;
-    background:linear-gradient(175deg,#1e1e1e 0%,#141414 55%,#0f0f0f 100%);
-    border:1px solid rgba(230,117,10,0.22);
-    border-top:2px solid rgba(230,117,10,0.75);
+    background:var(--g-grad);
+    border:1px solid color-mix(in srgb,var(--g-edge) 22%,transparent);
+    border-top:2px solid color-mix(in srgb,var(--g-acc) 75%,transparent);
     box-shadow:inset 0 1px 0 rgba(255,255,255,0.06),0 8px 28px rgba(0,0,0,0.65);
     padding:16px;transition:background .5s ease,border-color .5s ease,box-shadow .5s ease;
   }
@@ -1171,26 +1237,26 @@ const _LC_CSS = `
   }
 
   .provider{
-    color:#ffc06a;font-size:11px;font-weight:700;text-transform:uppercase;
-    font-family:'Orbitron',monospace;letter-spacing:1px;
+    color:var(--g-acc2);font-size:11px;font-weight:700;text-transform:uppercase;
+    font-family:var(--g-font-t);letter-spacing:1px;
   }
-  .mission{font-size:18px;font-weight:700;line-height:1.2;color:#f2f2f2;margin-top:2px;}
+  .mission{font-size:18px;font-weight:700;line-height:1.2;color:var(--g-text);margin-top:2px;}
 
   .launch-time{
     display:flex;align-items:center;gap:6px;margin-top:10px;
-    color:#ffc06a;font-size:14px;font-weight:700;font-family:'Orbitron',monospace;
+    color:var(--g-acc2);font-size:14px;font-weight:700;font-family:var(--g-font-t);
   }
-  .launch-time ha-icon{--mdc-icon-size:16px;color:#ffc06a;}
+  .launch-time ha-icon{--mdc-icon-size:16px;color:var(--g-acc2);}
   .launch-time.blink{animation:lc-blink 1s infinite;color:var(--err);}
   .launch-time.blink ha-icon{color:var(--err);}
 
-  .info{color:rgba(210,180,140,0.75);font-size:12px;margin-top:8px;line-height:1.3;}
-  .info ha-icon{--mdc-icon-size:14px;color:rgba(210,180,140,0.75);vertical-align:-2px;}
+  .info{color:color-mix(in srgb,var(--g-muted) 75%,transparent);font-size:12px;margin-top:8px;line-height:1.3;}
+  .info ha-icon{--mdc-icon-size:14px;color:color-mix(in srgb,var(--g-muted) 75%,transparent);vertical-align:-2px;}
   .info .facility{font-size:10px;opacity:.8;margin-left:18px;display:block;margin-top:1px;}
 
   .stats{
-    display:flex;flex-direction:column;gap:6px;font-size:14px;text-align:left;color:#f2f2f2;
-    padding:10px 0;border-top:1px solid rgba(230,117,10,0.14);border-bottom:1px solid rgba(230,117,10,0.14);
+    display:flex;flex-direction:column;gap:6px;font-size:14px;text-align:left;color:var(--g-text);
+    padding:10px 0;border-top:1px solid color-mix(in srgb,var(--g-edge) 14%,transparent);border-bottom:1px solid color-mix(in srgb,var(--g-edge) 14%,transparent);
     margin:10px 0;
   }
   .stats .row{display:flex;justify-content:space-between;}
@@ -1199,11 +1265,11 @@ const _LC_CSS = `
   .stats .row.status.nogo{color:var(--c4);}
 
   .desc{
-    font-size:12px;color:rgba(210,180,140,0.65);text-align:left;white-space:normal;
+    font-size:12px;color:color-mix(in srgb,var(--g-muted) 65%,transparent);text-align:left;white-space:normal;
     display:-webkit-box;-webkit-line-clamp:8;-webkit-box-orient:vertical;overflow:hidden;
   }
 
-  .empty-state{text-align:center;padding:26px 12px;color:rgba(210,180,140,0.52);font-size:0.85rem;}
+  .empty-state{text-align:center;padding:26px 12px;color:color-mix(in srgb,var(--g-muted) 52%,transparent);font-size:0.85rem;}
 `;
 
 class GlossyLaunchCard extends HTMLElement {
@@ -1218,6 +1284,7 @@ class GlossyLaunchCard extends HTMLElement {
   setConfig(config) {
     config = config || {};
     this._config = {
+      theme: config.theme || 'v2',
       entity: config.entity || '',
       mission_entity: config.mission_entity || '',
       date_entity: config.date_entity || '',
@@ -1239,6 +1306,7 @@ class GlossyLaunchCard extends HTMLElement {
   set hass(h) {
     this._h = h;
     if (!this._config) return; // hass peut arriver avant setConfig()
+    _issTheme(this, this._config.theme, h);
     if (!this._ok) this._init();
     const ents = [this._config.entity, this._config.mission_entity, this._config.date_entity,
       this._config.probability_entity, this._config.status_entity].filter(Boolean);
@@ -1421,6 +1489,7 @@ class GlossyLaunchCardEditor extends HTMLElement {
         .hint{font-size:11px;color:var(--secondary-text-color,#888);margin:-6px 0 12px;}
       </style>
       <div class="wrap">
+        ${_issThemeField(cfg.theme)}
         <div class="field"><label>Entité principale (provider / pad / facility)</label><ha-entity-picker id="entity"></ha-entity-picker></div>
         <div class="field"><label>Entité mission (nom, orbite, lanceur, description)</label><ha-entity-picker id="mission_entity"></ha-entity-picker></div>
         <div class="field"><label>Entité date de lancement</label><ha-entity-picker id="date_entity"></ha-entity-picker></div>
@@ -1451,6 +1520,7 @@ class GlossyLaunchCardEditor extends HTMLElement {
       this._emit();
     });
 
+    _issBindTheme(this);
     this._built = true;
   }
 
@@ -1462,10 +1532,10 @@ class GlossyLaunchCardEditor extends HTMLElement {
 define('glossy-launch-card-editor', GlossyLaunchCardEditor);
 
 // ── Tableau de bord complet (les quatre cartes en une) ──────────────────
-const _GS_CSS = `
-:host{display:block;font-family:'Rajdhani','Nunito',sans-serif;color:#f2f2f2;font-size:16px;--orange:#e6750a;--amber:#ffc06a;--muted:rgba(210,180,140,.62);--ok:#22dd88;--err:#ff4466;--panel:rgba(25,25,25,.9)}
-*{box-sizing:border-box}.shell{container-type:inline-size;position:relative;overflow:hidden;padding:10px;border:1px solid rgba(230,117,10,.2);border-radius:18px;background:linear-gradient(175deg,#1e1e1e,#141414 58%,#0d0d0d);box-shadow:inset 0 1px rgba(255,255,255,.06),0 10px 32px rgba(0,0,0,.55)}
-.shell:before{content:'';position:absolute;inset:0 0 auto;height:2px;background:linear-gradient(90deg,transparent,#e6750a,transparent);opacity:.8}.top{position:relative;z-index:1;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 12px;margin-bottom:10px;border:1px solid rgba(230,117,10,.22);border-top:2px solid rgba(230,117,10,.65);border-radius:12px;background:linear-gradient(175deg,#202020,#131313)}.brand{display:flex;align-items:center;gap:10px;color:var(--amber)}.brand ha-icon{--mdc-icon-size:21px}.brand strong{font:700 13px 'Orbitron',monospace;letter-spacing:1px}.top-status{color:var(--ok);font:12px 'DM Mono',monospace}.top-status.bad{color:var(--err)}.grid{position:relative;z-index:1;display:grid;grid-template-columns:minmax(0,1.2fr) minmax(280px,.8fr);gap:10px}.left,.right{display:flex;flex-direction:column;gap:10px}.panel{position:relative;overflow:hidden;padding:15px;border:1px solid rgba(230,117,10,.2);border-radius:14px;background:linear-gradient(175deg,rgba(30,30,30,.96),rgba(15,15,15,.96));box-shadow:inset 0 1px rgba(255,255,255,.04)}.section-title{display:flex;align-items:center;gap:8px;margin-bottom:11px;padding-bottom:6px;border-bottom:1px solid rgba(230,117,10,.24);color:rgba(230,117,10,.9);font:600 11px 'Orbitron',monospace;letter-spacing:1.6px;text-transform:uppercase}.section-title:after{content:'';flex:1;height:1px;background:rgba(230,117,10,.18)}.tracker-bar{display:flex;align-items:center;gap:9px;margin-bottom:8px;color:var(--amber);font:700 12px 'Orbitron',monospace;letter-spacing:1px}.tracker-bar .coords{margin-left:auto;color:var(--ok);font:12px 'DM Mono',monospace;letter-spacing:0}.map{position:relative;width:100%;height:260px;overflow:hidden;border-radius:11px;background:#0d0d0d}.map-empty{height:100%;display:grid;place-items:center;text-align:center;padding:20px;color:var(--muted);font-size:13px}.tiles{position:absolute;inset:0}.tiles img{position:absolute;width:256px;height:256px;max-width:none;user-select:none;pointer-events:none}.dot{position:absolute;left:50%;top:50%;width:16px;height:16px;margin:-8px 0 0 -8px;border-radius:50%;background:var(--dc,#22dd88);box-shadow:0 0 0 4px color-mix(in srgb,var(--dc,#22dd88) 25%,transparent),0 0 14px var(--dc,#22dd88)}.attr{position:absolute;right:6px;bottom:4px;font-size:9px;color:rgba(210,180,140,.6);background:rgba(14,14,14,.6);padding:1px 5px;border-radius:4px}.attr a{color:inherit;text-decoration:none}@keyframes gs-blink{0%,100%{opacity:1}50%{opacity:.35}}.panel.imminent{background:rgba(255,68,102,.08);border:2px solid rgba(255,68,102,.9);box-shadow:inset 0 0 4px rgba(255,68,102,.8),inset 0 0 10px rgba(255,68,102,.35)}.panel.imminent .launch-date{color:var(--err);animation:gs-blink 1s infinite}.statline{display:flex;justify-content:space-between;gap:10px;margin-top:9px;color:var(--muted);font-size:12px}.statline b{color:#f2f2f2}.good{color:var(--ok)!important}.bad{color:var(--err)!important}.warn{color:var(--amber)!important}.pass p{margin:4px 0;color:var(--muted);font-size:13px;line-height:1.45}.pass strong{color:var(--amber)}.pass+.pass{margin-top:12px;padding-top:10px;border-top:1px solid rgba(230,117,10,.15)}.graph-now{color:#f2f2f2;font:800 20px 'Orbitron',monospace}.graph-unit{margin-left:5px;color:var(--muted);font-size:11px}.graph{width:100%;height:55px;margin-top:6px}.launch-provider{color:var(--amber);font:700 11px 'Orbitron',monospace;letter-spacing:1px;text-transform:uppercase}.launch-mission{margin-top:3px;color:#f2f2f2;font-size:18px;font-weight:700}.launch-date{margin-top:8px;color:var(--amber);font:700 13px 'Orbitron',monospace}.launch-info{margin-top:8px;color:var(--muted);font-size:12px;line-height:1.4}.launch-stats{display:flex;flex-direction:column;gap:5px;margin:10px 0;padding:9px 0;border-top:1px solid rgba(230,117,10,.14);border-bottom:1px solid rgba(230,117,10,.14);font-size:13px}.launch-stats div{display:flex;justify-content:space-between;gap:8px}.launch-desc{color:var(--muted);font-size:11px;line-height:1.35}.transit-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}.transit{padding:12px;border:1px solid rgba(230,117,10,.2);border-radius:11px;background:rgba(255,255,255,.025)}.transit h4{display:flex;align-items:center;gap:7px;margin:0 0 9px;color:var(--amber);font:700 11px 'Orbitron',monospace;letter-spacing:.7px}.transit.lunar h4{color:#8ab4ff}.transit-date{font:700 13px 'Orbitron',monospace;line-height:1.35}.transit-count{display:inline-block;margin-top:7px;padding:3px 8px;border:1px solid rgba(230,117,10,.2);border-radius:20px;color:var(--amber);font-size:11px}.metrics{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:10px}.metric{padding:7px 4px;text-align:center;border:1px solid rgba(230,117,10,.14);border-radius:8px;background:rgba(255,255,255,.03)}.metric small{display:block;color:var(--muted);font-size:9px;text-transform:uppercase}.metric b{font:700 12px 'Orbitron',monospace}.empty{padding:12px;color:var(--muted);font-size:12px;text-align:center}.footer{position:relative;z-index:1;display:flex;justify-content:space-between;gap:10px;margin-top:9px;padding:2px 4px;color:rgba(210,180,140,.42);font:10px 'DM Mono',monospace;letter-spacing:.5px}/* selon la largeur de la carte, pas de l'écran : une carte dans une colonne étroite se met sur une colonne */@container (max-width:760px){.grid{grid-template-columns:1fr}.map{height:230px}}@container (max-width:420px){.top{align-items:flex-start;flex-direction:column}.tracker-bar{flex-wrap:wrap}.tracker-bar .coords{margin-left:0;flex-basis:100%}.transit-grid{grid-template-columns:1fr}.footer{flex-direction:column}}
+const _GS_CSS = _ISS_THEME_CSS + `
+:host{display:block;font-family:var(--g-font);color:var(--g-text);font-size:16px;--orange:var(--g-acc);--amber:var(--g-acc2);--muted:color-mix(in srgb,var(--g-muted) 62%,transparent);--ok:#22dd88;--err:#ff4466;--panel:var(--g-panel)}
+*{box-sizing:border-box}.shell{container-type:inline-size;position:relative;overflow:hidden;padding:10px;border:1px solid color-mix(in srgb,var(--g-edge) 20%,transparent);border-radius:18px;background:var(--g-grad);box-shadow:inset 0 1px rgba(255,255,255,.06),0 10px 32px rgba(0,0,0,.55)}
+.shell:before{content:'';position:absolute;inset:0 0 auto;height:2px;background:linear-gradient(90deg,transparent,var(--g-acc),transparent);opacity:.8}.top{position:relative;z-index:1;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 12px;margin-bottom:10px;border:1px solid color-mix(in srgb,var(--g-edge) 22%,transparent);border-top:2px solid color-mix(in srgb,var(--g-acc) 65%,transparent);border-radius:12px;background:var(--g-grad)}.brand{display:flex;align-items:center;gap:10px;color:var(--amber)}.brand ha-icon{--mdc-icon-size:21px}.brand strong{font:700 13px var(--g-font-t);letter-spacing:1px}.top-status{color:var(--ok);font:12px var(--g-font-m)}.top-status.bad{color:var(--err)}.grid{position:relative;z-index:1;display:grid;grid-template-columns:minmax(0,1.2fr) minmax(280px,.8fr);gap:10px}.left,.right{display:flex;flex-direction:column;gap:10px}.panel{position:relative;overflow:hidden;padding:15px;border:1px solid color-mix(in srgb,var(--g-edge) 20%,transparent);border-radius:14px;background:var(--g-panel);box-shadow:inset 0 1px rgba(255,255,255,.04)}.section-title{display:flex;align-items:center;gap:8px;margin-bottom:11px;padding-bottom:6px;border-bottom:1px solid color-mix(in srgb,var(--g-edge) 24%,transparent);color:color-mix(in srgb,var(--g-acc) 90%,transparent);font:600 11px var(--g-font-t);letter-spacing:1.6px;text-transform:uppercase}.section-title:after{content:'';flex:1;height:1px;background:color-mix(in srgb,var(--g-edge) 18%,transparent)}.tracker-bar{display:flex;align-items:center;gap:9px;margin-bottom:8px;color:var(--amber);font:700 12px var(--g-font-t);letter-spacing:1px}.tracker-bar .coords{margin-left:auto;color:var(--ok);font:12px var(--g-font-m);letter-spacing:0}.map{position:relative;width:100%;height:260px;overflow:hidden;border-radius:11px;background:var(--g-deep)}.map-empty{height:100%;display:grid;place-items:center;text-align:center;padding:20px;color:var(--muted);font-size:13px}.tiles{position:absolute;inset:0}.tiles img{position:absolute;width:256px;height:256px;max-width:none;user-select:none;pointer-events:none}.dot{position:absolute;left:50%;top:50%;width:16px;height:16px;margin:-8px 0 0 -8px;border-radius:50%;background:var(--dc,#22dd88);box-shadow:0 0 0 4px color-mix(in srgb,var(--dc,#22dd88) 25%,transparent),0 0 14px var(--dc,#22dd88)}.attr{position:absolute;right:6px;bottom:4px;font-size:9px;color:color-mix(in srgb,var(--g-muted) 60%,transparent);background:color-mix(in srgb,var(--g-deep) 60%,transparent);padding:1px 5px;border-radius:4px}.attr a{color:inherit;text-decoration:none}@keyframes gs-blink{0%,100%{opacity:1}50%{opacity:.35}}.panel.imminent{background:rgba(255,68,102,.08);border:2px solid rgba(255,68,102,.9);box-shadow:inset 0 0 4px rgba(255,68,102,.8),inset 0 0 10px rgba(255,68,102,.35)}.panel.imminent .launch-date{color:var(--err);animation:gs-blink 1s infinite}.statline{display:flex;justify-content:space-between;gap:10px;margin-top:9px;color:var(--muted);font-size:12px}.statline b{color:var(--g-text)}.good{color:var(--ok)!important}.bad{color:var(--err)!important}.warn{color:var(--amber)!important}.pass p{margin:4px 0;color:var(--muted);font-size:13px;line-height:1.45}.pass strong{color:var(--amber)}.pass+.pass{margin-top:12px;padding-top:10px;border-top:1px solid color-mix(in srgb,var(--g-edge) 15%,transparent)}.graph-now{color:var(--g-text);font:800 20px var(--g-font-t)}.graph-unit{margin-left:5px;color:var(--muted);font-size:11px}.graph{width:100%;height:55px;margin-top:6px}.launch-provider{color:var(--amber);font:700 11px var(--g-font-t);letter-spacing:1px;text-transform:uppercase}.launch-mission{margin-top:3px;color:var(--g-text);font-size:18px;font-weight:700}.launch-date{margin-top:8px;color:var(--amber);font:700 13px var(--g-font-t)}.launch-info{margin-top:8px;color:var(--muted);font-size:12px;line-height:1.4}.launch-stats{display:flex;flex-direction:column;gap:5px;margin:10px 0;padding:9px 0;border-top:1px solid color-mix(in srgb,var(--g-edge) 14%,transparent);border-bottom:1px solid color-mix(in srgb,var(--g-edge) 14%,transparent);font-size:13px}.launch-stats div{display:flex;justify-content:space-between;gap:8px}.launch-desc{color:var(--muted);font-size:11px;line-height:1.35}.transit-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}.transit{padding:12px;border:1px solid color-mix(in srgb,var(--g-edge) 20%,transparent);border-radius:11px;background:rgba(255,255,255,.025)}.transit h4{display:flex;align-items:center;gap:7px;margin:0 0 9px;color:var(--amber);font:700 11px var(--g-font-t);letter-spacing:.7px}.transit.lunar h4{color:#8ab4ff}.transit-date{font:700 13px var(--g-font-t);line-height:1.35}.transit-count{display:inline-block;margin-top:7px;padding:3px 8px;border:1px solid color-mix(in srgb,var(--g-edge) 20%,transparent);border-radius:20px;color:var(--amber);font-size:11px}.metrics{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:10px}.metric{padding:7px 4px;text-align:center;border:1px solid color-mix(in srgb,var(--g-edge) 14%,transparent);border-radius:8px;background:rgba(255,255,255,.03)}.metric small{display:block;color:var(--muted);font-size:9px;text-transform:uppercase}.metric b{font:700 12px var(--g-font-t)}.empty{padding:12px;color:var(--muted);font-size:12px;text-align:center}.footer{position:relative;z-index:1;display:flex;justify-content:space-between;gap:10px;margin-top:9px;padding:2px 4px;color:color-mix(in srgb,var(--g-muted) 42%,transparent);font:10px var(--g-font-m);letter-spacing:.5px}/* selon la largeur de la carte, pas de l'écran : une carte dans une colonne étroite se met sur une colonne */@container (max-width:760px){.grid{grid-template-columns:1fr}.map{height:230px}}@container (max-width:420px){.top{align-items:flex-start;flex-direction:column}.tracker-bar{flex-wrap:wrap}.tracker-bar .coords{margin-left:0;flex-basis:100%}.transit-grid{grid-template-columns:1fr}.footer{flex-direction:column}}
 `;
 
 function _gsEsc(v){return (v??'').toString().replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
@@ -1475,11 +1545,11 @@ const _gsDuration=_issDuration;
 
 class GlossySpaceDashboardCard extends HTMLElement{
  constructor(){super();this.attachShadow({mode:'open'});this._ok=false;this._h=null;this._resize=null;this._history=null;this._historyAt=0}
- setConfig(c){c=c||{};this._config={title:c.title||'SPACE OPERATIONS',tracker:{...(c.tracker||{}),lat_entity:'',lon_entity:''},passes:{...(c.passes||{})},launch:{...(c.launch||{})},transits:{...(c.transits||{})}};this._fp=null;this._history=null;if(this._ok){this._build();if(this._h)this.hass=this._h}}
+ setConfig(c){c=c||{};this._config={theme:c.theme||'v2',title:c.title||'SPACE OPERATIONS',tracker:{...(c.tracker||{}),lat_entity:'',lon_entity:''},passes:{...(c.passes||{})},launch:{...(c.launch||{})},transits:{...(c.transits||{})}};this._fp=null;this._history=null;if(this._ok){this._build();if(this._h)this.hass=this._h}}
  getCardSize(){return 8}
  static getConfigElement(){return document.createElement('glossy-space-dashboard-card-editor')}
  static getStubConfig(){return {title:'SPACE OPERATIONS',tracker:{entity:''},passes:{},launch:{entity:''},transits:{}}}
- set hass(h){this._h=h;if(!this._config)return;const t=this._config.tracker||{};let cleaned=false;for(const key of ['lat_entity','lon_entity']){if(t[key]&&!h.states[t[key]]){t[key]='';cleaned=true}}if(cleaned)this._config={...this._config,tracker:{...t}};if(!this._ok)this._init();const ids=this._ids();const fp=ids.map(id=>{const s=h.states[id];return id+'|'+(s?.state||'x')+'|'+JSON.stringify(s?.attributes||{})}).join('||');if(fp===this._fp)return;this._fp=fp;this._update()}
+ set hass(h){this._h=h;if(!this._config)return;_issTheme(this,this._config.theme,h);const t=this._config.tracker||{};let cleaned=false;for(const key of ['lat_entity','lon_entity']){if(t[key]&&!h.states[t[key]]){t[key]='';cleaned=true}}if(cleaned)this._config={...this._config,tracker:{...t}};if(!this._ok)this._init();const ids=this._ids();const fp=ids.map(id=>{const s=h.states[id];return id+'|'+(s?.state||'x')+'|'+JSON.stringify(s?.attributes||{})}).join('||');if(fp===this._fp)return;this._fp=fp;this._update()}
  _ids(){const c=this._config||{};return [c.tracker.entity,c.tracker.status_entity,c.passes.visible_readable_entity,c.passes.visible_attrs_entity,c.passes.global_readable_entity,c.passes.global_attrs_entity,c.passes.distance_entity,c.launch.entity,c.launch.mission_entity,c.launch.date_entity,c.launch.probability_entity,c.launch.status_entity,c.transits.solar_entity,c.transits.lunar_entity].filter(Boolean)}
  _init(){this._ok=true;const sh=this.shadowRoot;sh.innerHTML=`<style>${_GS_CSS}</style><div class="shell"><div class="top"><div class="brand"><ha-icon icon="mdi:satellite-variant"></ha-icon><strong id="title"></strong></div><span class="top-status" id="top-status">SYSTEM READY</span></div><div class="grid"><div class="left"><div class="panel" id="tracker-panel"></div><div class="panel" id="passes-panel"></div></div><div class="right"><div class="panel" id="launch-panel"></div><div class="panel" id="transits-panel"></div></div></div><div class="footer"><span>LIVE SPACE TELEMETRY</span><span>GLOSSY HC3 / HOME ASSISTANT</span></div></div>`;this._w=sh.querySelector('.shell');this._build();if(!this._tick)this._tick=setInterval(()=>this._h&&this._updateLaunch(),30000)}
  _build(){if(!this._w)return;this._w.querySelector('#title').textContent=this._config.title;this._buildTracker();this._buildPasses();this._buildLaunch();this._buildTransits()}
@@ -1492,7 +1562,7 @@ class GlossySpaceDashboardCard extends HTMLElement{
  _drawTiles(){const map=this._w&&this._w.querySelector('#map'),layer=map&&map.querySelector('.tiles');if(!layer||!this._pos)return;const W=map.offsetWidth,H=map.offsetHeight;if(!W||!H)return;const p=this._pos;layer.innerHTML=_issTilesHtml(p.lat,p.lon,_issZoom(this._config.tracker.zoom_span),W,H,p.tile);map.querySelector('.dot')?.style.setProperty('--dc',p.color)}
  _updatePasses(){const c=this._config.passes||{},s=this._h.states;const render=(id,readId,attrId)=>{const el=this._w.querySelector('#'+id);if(!el)return;const read=s[readId],a=s[attrId]?.attributes||{};let h=`<p><strong>Début :</strong> ${_gsEsc(read?.state||'—')}</p>`;if(a.duration!=null)h+=`<p><strong>Durée :</strong> ${(parseFloat(a.duration)/60).toFixed(1)} min</p>`;if(a.maxEl!=null)h+=`<p><strong>Élévation max :</strong> ${_gsEsc(a.maxEl)}°</p>`;const path=[a.startAzCompass,a.maxAzCompass,a.endAzCompass].filter(Boolean).join(' → ');if(path)h+=`<p><strong>Trajet :</strong> ${_gsEsc(path)}</p>`;el.innerHTML=h};render('pass-visible',c.visible_readable_entity,c.visible_attrs_entity);render('pass-global',c.global_readable_entity,c.global_attrs_entity);const st=s[c.distance_entity],now=this._w.querySelector('#distance-now');if(now&&st){const n=parseFloat(st.state);now.textContent=Number.isFinite(n)?Math.round(n).toLocaleString('fr-FR'):'—'}if(c.distance_entity)this._loadHistory()}
  async _loadHistory(){const c=this._config.passes||{};if(!this._h?.connection||!c.distance_entity)return;if(Date.now()-this._historyAt<300000&&this._history)return;this._historyAt=Date.now();try{const start=new Date(Date.now()-(c.distance_hours||12)*3600000).toISOString();const r=await this._h.connection.sendMessagePromise({type:'history/history_during_period',start_time:start,entity_ids:[c.distance_entity],minimal_response:true,no_attributes:true});this._history=(r?.[c.distance_entity]||[]).map(x=>parseFloat(x.s??x.state)).filter(Number.isFinite);this._drawHistory()}catch(e){console.warn('[glossy-space-dashboard-card] history unavailable',e)}}
- _drawHistory(){const svg=this._w.querySelector('#distance-graph'),v=this._history;if(!svg||!v||v.length<2)return;const min=Math.min(...v),range=Math.max(...v)-min||1,W=300,H=55,p=v.map((n,i)=>`${(i/(v.length-1)*W).toFixed(1)},${(H-5-((n-min)/range)*(H-10)).toFixed(1)}`).join(' ');svg.innerHTML=`<polygon points="0,${H} ${p} ${W},${H}" fill="rgba(230,117,10,.15)"/><polyline points="${p}" fill="none" stroke="#ff8c33" stroke-width="2"/>`}
+ _drawHistory(){const svg=this._w.querySelector('#distance-graph'),v=this._history;if(!svg||!v||v.length<2)return;const min=Math.min(...v),range=Math.max(...v)-min||1,W=300,H=55,p=v.map((n,i)=>`${(i/(v.length-1)*W).toFixed(1)},${(H-5-((n-min)/range)*(H-10)).toFixed(1)}`).join(' ');svg.innerHTML=`<polygon points="0,${H} ${p} ${W},${H}" style="fill:color-mix(in srgb,var(--g-acc) 15%,transparent)"/><polyline points="${p}" fill="none" stroke-width="2" style="stroke:var(--g-acc)"/>`}
  _updateLaunch(){const c=this._config.launch||{},s=this._h.states,main=s[c.entity],mission=s[c.mission_entity],date=s[c.date_entity],proba=s[c.probability_entity],status=s[c.status_entity];const q=id=>this._w.querySelector('#'+id);if(q('launch-provider'))q('launch-provider').textContent=main?.attributes?.provider||'—';if(q('launch-mission'))q('launch-mission').textContent=mission?.state||main?.state||'—';if(q('launch-date'))q('launch-date').textContent=date?.state?_gsDate(date.state):'—';{const m=(new Date(date?.state).getTime()-Date.now())/60000;this._w.querySelector('#launch-panel')?.classList.toggle('imminent',Number.isFinite(m)&&m>0&&m<(c.imminent_minutes??15))}if(q('launch-info')){const a=main?.attributes||{};q('launch-info').innerHTML=a.pad?`📍 <b>${_gsEsc(a.pad)}</b>${a.facility?`<br><small>${_gsEsc(a.facility)}</small>`:''}`:''}if(q('launch-stats')){const a=mission?.attributes||{};q('launch-stats').innerHTML=`<div><b>Météo</b><span>${proba?.state&&!['unknown','unavailable'].includes(proba.state)?_gsEsc(proba.state)+'%':'Pas de donnée'}</span></div><div><b>Lanceur</b><span>${_gsEsc(a.rocket_name||'—')}</span></div><div><b>Orbite</b><span>${_gsEsc(a.target_orbit||'—')}</span></div>${c.status_entity?`<div class="${/go/i.test(status?.state||'')?'good':'warn'}"><b>Statut</b><b>${_gsEsc(status?.state||'—')}</b></div>`:''}`}if(q('launch-desc'))q('launch-desc').textContent=mission?.attributes?.description||''}
  _updateTransits(){const c=this._config.transits||{},s=this._h.states;for(const type of ['solar','lunar']){const body=this._w.querySelector('#transit-body-'+type),st=s[c[type+'_entity']];if(!body||!st)continue;const a=st.attributes||{},date=a.date;if(!date){body.innerHTML=`<div class="empty">Aucun transit prévu dans l'année.${a.closest_approach_deg!=null?`<br>Approche : <b>${Number(a.closest_approach_deg).toFixed(1)}°</b>`:''}</div>`;continue}body.innerHTML=`<div class="transit-date">${_gsEsc(_gsDate(date))}</div><span class="transit-count">${_gsEsc(_gsCountdown(date))}</span><div class="metrics"><div class="metric"><small>Durée</small><b>${_gsDuration(a.duration_seconds)}</b></div><div class="metric"><small>Élévation</small><b>${a.max_elevation_deg!=null?Number(a.max_elevation_deg).toFixed(1)+'°':'—'}</b></div>${type==='lunar'?`<div class="metric" style="grid-column:1/-1"><small>Distance ISS</small><b>${a.iss_distance_km!=null?Math.round(a.iss_distance_km).toLocaleString('fr-FR')+' km':'—'}</b></div>`:''}</div>`}}
  connectedCallback(){if(this._ok&&!this._tick)this._tick=setInterval(()=>this._h&&this._updateLaunch(),30000)}
@@ -1501,14 +1571,14 @@ class GlossySpaceDashboardCard extends HTMLElement{
 define('glossy-space-dashboard-card', GlossySpaceDashboardCard);
 
 class GlossySpaceDashboardCardEditor extends HTMLElement{
- setConfig(config){const c=config||{};this._config={type:'custom:glossy-space-dashboard-card',title:c.title||'SPACE OPERATIONS',tracker:{...(c.tracker||{}),lat_entity:'',lon_entity:''},passes:{...(c.passes||{})},launch:{...(c.launch||{})},transits:{...(c.transits||{})}};if(this._hass&&!this._built)this._render()}
+ setConfig(config){const c=config||{};this._config={type:'custom:glossy-space-dashboard-card',theme:c.theme||'v2',title:c.title||'SPACE OPERATIONS',tracker:{...(c.tracker||{}),lat_entity:'',lon_entity:''},passes:{...(c.passes||{})},launch:{...(c.launch||{})},transits:{...(c.transits||{})}};if(this._hass&&!this._built)this._render()}
  set hass(hass){this._hass=hass;if(!this._built)this._render();else this._syncPickers()}
  connectedCallback(){if(this._config)this._render()}
  _emit(){this._config={...this._config,type:'custom:glossy-space-dashboard-card'};this.dispatchEvent(new CustomEvent('config-changed',{detail:{config:this._config},bubbles:true,composed:true}))}
  _esc(v){return (v??'').toString().replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
  _render(){if(!this._config||!this._hass)return;if(!this.shadowRoot)this.attachShadow({mode:'open'});const c=this._config,t=c.tracker||{},p=c.passes||{},l=c.launch||{},x=c.transits||{};this.shadowRoot.innerHTML=`<style>
   .wrap{padding:4px 0;font-family:var(--paper-font-body1_-_font-family,Arial,sans-serif)}.group{margin:16px 0 20px;padding:12px;border:1px solid var(--divider-color,#555);border-radius:10px}.group h3{margin:0 0 12px;font-size:13px;color:var(--primary-text-color,#eee)}.field{margin:0 0 11px}.field:last-child{margin-bottom:0}label{display:block;margin:0 0 4px;font-size:12px;color:var(--secondary-text-color,#999)}input{width:100%;box-sizing:border-box;padding:8px;border:1px solid var(--divider-color,#555);border-radius:6px;background:var(--card-background-color,#1c1c1c);color:var(--primary-text-color,#eee)}.hint{font-size:11px;line-height:1.4;color:var(--secondary-text-color,#888);margin-top:-4px;margin-bottom:12px}
- </style><div class="wrap"><div class="field"><label>Titre du dashboard</label><input id="title" value="${this._esc(c.title)}"></div>
+ </style><div class="wrap">${_issThemeField(c.theme)}<div class="field"><label>Titre du dashboard</label><input id="title" value="${this._esc(c.title)}"></div>
  <div class="group"><h3>ISS Tracker</h3><div class="field"><label>Entité position (latitude / longitude)</label><ha-entity-picker id="tracker.entity"></ha-entity-picker></div><div class="field"><label>Entité statut</label><ha-entity-picker id="tracker.status_entity"></ha-entity-picker></div><div class="field"><label>Largeur de vue carte (degrés)</label><input id="tracker.zoom_span" type="number" value="${this._esc(t.zoom_span??40)}"></div><div class="field"><label>Clé Stadia Maps (optionnelle)</label><input id="tracker.stadia_api_key" type="text" value="${this._esc(t.stadia_api_key||'')}"></div><div class="field"><label>Clé CARTO (optionnelle)</label><input id="tracker.carto_api_key" type="text" value="${this._esc(t.carto_api_key||'')}"></div><div class="hint">Une clé cartographique est nécessaire pour afficher les tuiles. Les contrôles +/− et l’attribution restent masqués dans la card.</div></div>
  <div class="group"><h3>Passages ISS</h3><div class="field"><label>Passage visible — texte</label><ha-entity-picker id="passes.visible_readable_entity"></ha-entity-picker></div><div class="field"><label>Passage visible — attributs</label><ha-entity-picker id="passes.visible_attrs_entity"></ha-entity-picker></div><div class="field"><label>Passage global — texte</label><ha-entity-picker id="passes.global_readable_entity"></ha-entity-picker></div><div class="field"><label>Passage global — attributs</label><ha-entity-picker id="passes.global_attrs_entity"></ha-entity-picker></div><div class="field"><label>Distance ISS</label><ha-entity-picker id="passes.distance_entity"></ha-entity-picker></div><div class="field"><label>Historique distance (heures)</label><input id="passes.distance_hours" type="number" value="${this._esc(p.distance_hours??12)}"></div></div>
  <div class="group"><h3>Prochain lancement</h3><div class="field"><label>Entité principale</label><ha-entity-picker id="launch.entity"></ha-entity-picker></div><div class="field"><label>Mission</label><ha-entity-picker id="launch.mission_entity"></ha-entity-picker></div><div class="field"><label>Date de lancement</label><ha-entity-picker id="launch.date_entity"></ha-entity-picker></div><div class="field"><label>Probabilité météo</label><ha-entity-picker id="launch.probability_entity"></ha-entity-picker></div><div class="field"><label>Statut du lancement</label><ha-entity-picker id="launch.status_entity"></ha-entity-picker></div><div class="field"><label>Seuil imminent (minutes)</label><input id="launch.imminent_minutes" type="number" value="${this._esc(l.imminent_minutes??15)}"></div></div>
@@ -1516,7 +1586,7 @@ class GlossySpaceDashboardCardEditor extends HTMLElement{
  const paths=['tracker.entity','tracker.status_entity','passes.visible_readable_entity','passes.visible_attrs_entity','passes.global_readable_entity','passes.global_attrs_entity','passes.distance_entity','launch.entity','launch.mission_entity','launch.date_entity','launch.probability_entity','launch.status_entity','transits.solar_entity','transits.lunar_entity'];
  const get=(path)=>path.split('.').reduce((o,k)=>o?.[k],this._config)||'';const set=(path,value)=>{const [section,key]=path.split('.');this._config={...this._config,[section]:{...(this._config[section]||{}),[key]:value}};this._emit()};
  paths.forEach(path=>{const picker=this.shadowRoot.getElementById(path);if(!picker)return;picker.hass=this._hass;picker.includeDomains=['sensor'];picker.value=get(path);picker.addEventListener('value-changed',e=>{e.stopPropagation();set(path,e.detail.value)})});
- const bind=(id,path,number=false)=>{const el=this.shadowRoot.getElementById(id);if(!el)return;el.addEventListener('input',e=>{const value=number?(parseFloat(e.target.value)||0):e.target.value;if(path==='title')this._config={...this._config,title:value};else{const [section,key]=path.split('.');this._config={...this._config,[section]:{...(this._config[section]||{}),[key]:value}}}this._emit()})};bind('title','title');bind('tracker.zoom_span','tracker.zoom_span',true);bind('tracker.stadia_api_key','tracker.stadia_api_key');bind('tracker.carto_api_key','tracker.carto_api_key');bind('passes.distance_hours','passes.distance_hours',true);bind('launch.imminent_minutes','launch.imminent_minutes',true);this._built=true
+ const bind=(id,path,number=false)=>{const el=this.shadowRoot.getElementById(id);if(!el)return;el.addEventListener('input',e=>{const value=number?(parseFloat(e.target.value)||0):e.target.value;if(path==='title')this._config={...this._config,title:value};else{const [section,key]=path.split('.');this._config={...this._config,[section]:{...(this._config[section]||{}),[key]:value}}}this._emit()})};bind('title','title');bind('tracker.zoom_span','tracker.zoom_span',true);bind('tracker.stadia_api_key','tracker.stadia_api_key');bind('tracker.carto_api_key','tracker.carto_api_key');bind('passes.distance_hours','passes.distance_hours',true);bind('launch.imminent_minutes','launch.imminent_minutes',true);_issBindTheme(this);this._built=true
  }
  _syncPickers(){if(!this.shadowRoot)return;this.shadowRoot.querySelectorAll('ha-entity-picker').forEach(p=>{p.hass=this._hass})}
 }
