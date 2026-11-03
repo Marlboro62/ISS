@@ -10,7 +10,7 @@
  *   custom:glossy-space-dashboard-card  les quatre en un seul tableau de bord
  */
 
-const CARD_VERSION = "0.6.0-beta.1";
+const CARD_VERSION = "0.6.0-beta.2";
 
 // Enregistrement sans erreur si une ancienne copie de la carte est encore
 // chargée comme ressource à côté de celle de HACS.
@@ -499,17 +499,24 @@ const _issLaunch = (() => {
   return { load, states, VCFG, onLoad: (f) => { listeners.add(f); return () => listeners.delete(f); }, get failed() { return !data && !!failedAt; } };
 })();
 
-// Diagnostic dans la console du navigateur (F12) : issCards.passages() liste les passages calculés.
+// Diagnostic dans la console du navigateur (F12) :
+//   issCards.passages()           tous les passages des 10 prochains jours
+//   issCards.passages(14, true)   seulement ceux qui sont visibles à l'œil nu
 window.issCards = window.issCards || {
-  passages: (days = 10) => {
+  passages: (days = 10, visibleOnly = false) => {
     const h = document.querySelector('home-assistant')?.hass, o = h && _issLive.observer(h);
     if (!o || !_ISS.sat) return console.warn('[iss-cards] position de Home Assistant ou éléments orbitaux indisponibles');
-    const d = (ms) => new Date(ms).toLocaleString('fr-FR');
-    console.table(_ISS.passes(_ISS.sat, _ISS.site(o.lat, o.lon, o.alt), Date.now(), days, 200).map((p) => ({
-      début: d(p.start), fin: d(p.end), 'haut. max': +p.maxEl.toFixed(2), trajet: [p.startAz, p.maxAz, p.endAz].map(_ISS.compass).join(' → '),
-      visible: p.vis ? `${d(p.vis.start)} → ${new Date(p.vis.end).toLocaleTimeString('fr-FR')}, ${p.vis.maxEl.toFixed(1)}°` : '',
-    })));
-    console.info('[iss-cards] TLE du', new Date(_ISS.sat.epochMs).toLocaleString('fr-FR'));
+    const st = _ISS.site(o.lat, o.lon, o.alt);
+    const d = (ms) => new Date(ms).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    const t = (ms) => new Date(ms).toLocaleTimeString('fr-FR');
+    const rows = _ISS.passes(_ISS.sat, st, Date.now(), days, 200).filter((p) => !visibleOnly || p.vis).map((p) => ({
+      début: d(p.start), min: +((p.end - p.start) / 60000).toFixed(1), haut: +p.maxEl.toFixed(1),
+      trajet: [p.startAz, p.maxAz, p.endAz].map(_ISS.compass).join('→'),
+      soleil: +_ISS.sunEl(p.maxT, st).toFixed(1),
+      visible: p.vis ? `${t(p.vis.start)}→${t(p.vis.end)} ${p.vis.maxEl.toFixed(1)}°` : '',
+    }));
+    console.table(rows);
+    console.info('[iss-cards] TLE du', new Date(_ISS.sat.epochMs).toLocaleString('fr-FR'), '— soleil : hauteur du Soleil à la culmination (°)');
   },
 };
 
