@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cartes ISS et espace — démo</title>
+<style>
+  body { margin: 0; padding: 24px; background: #0b0b0b; color: #ddd; font-family: system-ui, sans-serif; }
+  h1 { font-size: 18px; font-weight: 600; margin: 0 0 4px; }
+  p { margin: 0 0 18px; font-size: 13px; color: #999; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 16px; align-items: start; }
+</style>
+</head>
+<body>
+<h1>Cartes ISS et espace</h1>
+<p>Démo avec des capteurs fictifs : dates et valeurs inventées, aucune position réelle.</p>
+<div class="grid" id="grid"></div>
+<script type="module">
+await import("../iss-cards.js");
+const H = 3600e3, now = Date.now();
+const iso = (ms) => new Date(ms).toISOString();
+const fr = (ms) => new Date(ms).toLocaleDateString("fr-FR") + " à " + new Date(ms).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+const states = {};
+const add = (id, state, attributes = {}) => { states[id] = { entity_id: id, state: String(state), attributes }; };
+add("sensor.iss", 7, { latitude: 47.73, longitude: -103.34 });
+add("sensor.iss_prochain_passage_visible_lisible", fr(now + 26 * H));
+add("sensor.iss_prochain_passage_visible", "ok", { duration: 372, maxEl: 54.2, startAzCompass: "WSW", maxAzCompass: "SSE", endAzCompass: "E" });
+add("sensor.iss_prochain_passage_global_lisible", fr(now + 3 * H));
+add("sensor.iss_prochain_passage_global", "ok", { duration: 138, maxEl: 12.8, startAzCompass: "S", maxAzCompass: "SE", endAzCompass: "E" });
+add("sensor.distance_iss", 7096);
+add("sensor.iss_next_solar_transit", "ok", { date: iso(now + 9 * 24 * H + 5 * H), duration_seconds: 0.62, max_elevation_deg: 38.4 });
+add("sensor.iss_next_lunar_transit", "unknown", { closest_approach_deg: 1.0 });
+add("sensor.next_launch_prochain_lancement", "Exemple-1", { provider: "Agence Spatiale Exemple", pad: "Pas de tir fictif 1", facility: "Base de démonstration" });
+add("sensor.next_launch_mission_de_lancement", "Mission Démo", { target_orbit: "Low Earth Orbit", rocket_name: "Lanceur Exemple", description: "Mission de démonstration : nom, lanceur et description inventés pour illustrer la carte." });
+add("sensor.next_launch_date_de_lancement", iso(now + 20 * H));
+add("sensor.next_launch_probabilite_de_lancement", 80);
+add("sensor.next_launch_statut_de_lancement", "Go for Launch");
+// historique de distance : une orbite toutes les ~92 min
+const hist = Array.from({ length: 145 }, (_, i) => ({ s: String(Math.round(6000 + 5000 * Math.abs(Math.sin(i * Math.PI / 18.4)))), lu: (now - (144 - i) * 5 * 60e3) / 1000 }));
+const hass = { states, connection: { sendMessagePromise: async () => ({ "sensor.distance_iss": hist }) } };
+const cards = [
+  ["glossy-iss-tracker-card", { entity: "sensor.iss" }],
+  ["glossy-launch-card", { entity: "sensor.next_launch_prochain_lancement", mission_entity: "sensor.next_launch_mission_de_lancement", date_entity: "sensor.next_launch_date_de_lancement", probability_entity: "sensor.next_launch_probabilite_de_lancement", status_entity: "sensor.next_launch_statut_de_lancement" }],
+  ["glossy-iss-passes-card", { visible_readable_entity: "sensor.iss_prochain_passage_visible_lisible", visible_attrs_entity: "sensor.iss_prochain_passage_visible", global_readable_entity: "sensor.iss_prochain_passage_global_lisible", global_attrs_entity: "sensor.iss_prochain_passage_global", distance_entity: "sensor.distance_iss" }],
+  ["glossy-iss-transit-card", { solar_entity: "sensor.iss_next_solar_transit", lunar_entity: "sensor.iss_next_lunar_transit" }],
+];
+for (const [type, cfg] of cards) {
+  const el = document.createElement(type);
+  el.setConfig(cfg);
+  document.getElementById("grid").appendChild(el);
+  el.hass = hass;
+}
+</script>
+</body>
+</html>
