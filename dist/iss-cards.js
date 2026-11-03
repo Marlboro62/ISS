@@ -10,7 +10,7 @@
  *   custom:glossy-space-dashboard-card  les quatre en un seul tableau de bord
  */
 
-const CARD_VERSION = "0.7.0-beta.1";
+const CARD_VERSION = "0.7.0-beta.2";
 
 // Enregistrement sans erreur si une ancienne copie de la carte est encore
 // chargée comme ressource à côté de celle de HACS.
@@ -653,10 +653,21 @@ const _issVector = async (owner, wrap, lat, lon, z, light) => {
   if (!m) {
     m = new lib.maplibregl.Map({ container: host, style, center: [lon, lat], zoom, interactive: false, attributionControl: false, fadeDuration: 0 });
     m._issStyle = style; owner._vmap = m;
+    m.on('styledata', () => _issFrenchLabels(m));
   } else {
     if (m._issStyle !== style) { m.setStyle(style); m._issStyle = style; }
     m.resize();
     m.jumpTo({ center: [lon, lat], zoom });
+  }
+};
+/** Noms de lieux en français (sinon en alphabet latin, sinon le nom local) sur toutes les couches de texte. */
+const _issFrenchLabels = (m) => {
+  const st = m.getStyle && m.getStyle();
+  if (!st || !st.layers) return;
+  const field = ['coalesce', ['get', 'name:fr'], ['get', 'name:latin'], ['get', 'name_int'], ['get', 'name']];
+  for (const l of st.layers) {
+    if (l.type !== 'symbol' || !l.layout || !l.layout['text-field'] || l._issFr) continue;
+    try { m.setLayoutProperty(l.id, 'text-field', field); } catch (e) { /* couche sans nom */ }
   }
 };
 const _issDropVector = (owner) => { if (owner._vmap) { try { owner._vmap.remove(); } catch (e) { /* déjà retirée */ } owner._vmap = null; } };
