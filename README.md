@@ -28,7 +28,7 @@
 
 # Cartes ISS et espace
 
-**Cinq cartes Lovelace dans un seul fichier**, aux couleurs des autres cartes ([Météo](https://github.com/Marlboro62/meteo-card), [Carte Enedis Linky New](https://github.com/Marlboro62/content-card-linky-new)…) : bleu nuit par défaut, version claire, thème Home Assistant, ou **Glossy HC3 Fibaro** (fond noir, orange, police Orbitron) :
+**Cinq cartes Lovelace dans un seul fichier**, aux couleurs des autres cartes ([Météo](https://github.com/Marlboro62/meteo-card), [Carte Enedis Linky New](https://github.com/Marlboro62/content-card-linky-new)…) : bleu nuit par défaut, version claire, ou thème Home Assistant :
 
 | Type | Carte |
 | --- | --- |
@@ -47,7 +47,6 @@ Option commune à toutes les cartes, `theme` (« Couleurs de la carte » dans l'
 | `v2` (défaut) | Bleu nuit, comme les autres cartes |
 | `auto` | Bleu nuit, ou version claire quand Home Assistant est en mode clair |
 | `ha` | Couleurs du thème Home Assistant (clair ou sombre) |
-| `glossy` | Glossy HC3 Fibaro : fond noir, orange, police Orbitron |
 
 ![Space Operations](https://raw.githubusercontent.com/Marlboro62/ISS/main/images/tableau-de-bord.png)
 

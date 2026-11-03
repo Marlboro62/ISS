@@ -1,5 +1,5 @@
 /**
- * CARTES ISS ET ESPACE — Thème HC3 Fibaro Glossy
+ * CARTES ISS ET ESPACE — aux couleurs des cartes MyElectricalData
  * https://github.com/Marlboro62/ISS
  *
  * Cinq cartes dans un seul fichier :
@@ -10,7 +10,7 @@
  *   custom:glossy-space-dashboard-card  les quatre en un seul tableau de bord
  */
 
-const CARD_VERSION = "0.3.0-beta.1";
+const CARD_VERSION = "0.4.0-beta.1";
 
 // Enregistrement sans erreur si une ancienne copie de la carte est encore
 // chargée comme ressource à côté de celle de HACS.
@@ -19,7 +19,7 @@ const define = (name, cls) => { if (!customElements.get(name)) customElements.de
 // ── Couleurs : variables partagées par les cinq cartes ──
 // v2 (défaut) : bleu nuit des autres cartes (MyElectricalData, Météo, Serveur HA…)
 // light : version claire (thème « auto » quand Home Assistant est en clair)
-// ha : couleurs du thème Home Assistant ; glossy : orange HC3 Fibaro d'origine
+// ha : couleurs du thème Home Assistant
 const _ISS_THEME_CSS = `
 :host{
   --g-bg:#1a2434;--g-deep:#131c2a;--g-panel:#212d40;--g-grad:#1a2434;
@@ -38,17 +38,11 @@ const _ISS_THEME_CSS = `
   --g-acc:var(--primary-color,#03a9f4);--g-acc2:var(--primary-color,#03a9f4);--g-edge:var(--primary-color,#03a9f4);
   --g-text:var(--primary-text-color,#212121);--g-muted:var(--primary-text-color,#212121);
 }
-:host([data-theme="glossy"]){
-  --g-bg:#1a1a1a;--g-deep:#0e0e0e;--g-panel:rgba(28,28,28,.96);
-  --g-grad:linear-gradient(175deg,#1e1e1e 0%,#141414 55%,#0f0f0f 100%);
-  --g-acc:#e6750a;--g-acc2:#ffc06a;--g-edge:#e6750a;--g-text:#f2f2f2;--g-muted:#d2b48c;
-  --g-font:'Rajdhani','Nunito',sans-serif;--g-font-t:'Orbitron',monospace;--g-font-m:'DM Mono',monospace;
-}
 `;
 /** Applique le thème choisi (et le mode clair de Home Assistant pour « auto »). */
 const _issTheme = (el, theme, hass) => {
   const t = theme || 'v2', light = hass?.themes?.darkMode === false;
-  const mode = t === 'glossy' ? 'glossy' : t === 'ha' ? 'ha' : t === 'auto' && light ? 'light' : 'v2';
+  const mode = t === 'ha' ? 'ha' : t === 'auto' && light ? 'light' : 'v2';
   if (el.getAttribute('data-theme') === mode) return;
   el.setAttribute('data-theme', mode);
   if (el._reTheme) el._reTheme();
@@ -57,7 +51,6 @@ const _ISS_THEMES = [
   ['v2', 'Style MyElectricalData (bleu nuit)'],
   ['auto', 'Style MyElectricalData, clair ou sombre selon Home Assistant'],
   ['ha', 'Thème Home Assistant (clair ou sombre)'],
-  ['glossy', 'Glossy HC3 Fibaro (orange)'],
 ];
 /** Liste « Couleurs de la carte » dans un éditeur (champ <select id="theme">). */
 const _issThemeField = (cur) => `<div class="field"><label>Couleurs de la carte</label><select id="theme" style="width:100%;box-sizing:border-box;padding:7px 8px;border-radius:6px;border:1px solid var(--divider-color,#555);background:var(--card-background-color,#1c1c1c);color:var(--primary-text-color,#eee);font-size:13px;">${_ISS_THEMES.map(([v, l]) => `<option value="${v}"${(cur || 'v2') === v ? ' selected' : ''}>${l}</option>`).join('')}</select></div>`;
@@ -67,9 +60,8 @@ const _issBindTheme = (ed) => {
 };
 
 /**
- * GLOSSY ISS TRACKER CARD — Position de l'ISS + petite carte
+ * ISS TRACKER — Position de l'ISS + petite carte
  * type: custom:glossy-iss-tracker-card
- * Thème HC3 Fibaro Glossy
  *
  * YAML (seule "entity" est requise) :
  *
@@ -431,9 +423,8 @@ class GlossyIssTrackerCardEditor extends HTMLElement {
 define('glossy-iss-tracker-card-editor', GlossyIssTrackerCardEditor);
 
 /**
- * GLOSSY ISS PASSES CARD — Prochains passages ISS (visible/global) + distance
+ * PASSAGES ISS — Prochains passages ISS (visible/global) + distance
  * type: custom:glossy-iss-passes-card
- * Thème HC3 Fibaro Glossy
  *
  * YAML (tout est optionnel — chaque section ne s'affiche que si son
  * entité "readable" est configurée) :
@@ -552,10 +543,6 @@ class GlossyIssPassesCard extends HTMLElement {
     this._ok = true;
     const sh = this.shadowRoot;
     sh.innerHTML = '';
-    const lnk = document.createElement('link');
-    lnk.rel = 'stylesheet';
-    lnk.href = 'https://fonts.googleapis.com/css2?family=Orbitron:wght@700;800&family=Rajdhani:wght@400;600&display=swap';
-    sh.appendChild(lnk);
     const st = document.createElement('style');
     st.textContent = _IP_CSS;
     sh.appendChild(st);
@@ -801,9 +788,8 @@ class GlossyIssPassesCardEditor extends HTMLElement {
 define('glossy-iss-passes-card-editor', GlossyIssPassesCardEditor);
 
 /**
- * GLOSSY ISS TRANSIT CARD — Prochains transits solaires/lunaires de l'ISS
+ * TRANSITS ISS — Prochains transits solaires/lunaires de l'ISS
  * type: custom:glossy-iss-transit-card
- * Thème HC3 Fibaro Glossy
  *
  * Pensée pour l'intégration/capteur qui calcule les prochains transits
  * ISS devant le Soleil et la Lune (attributs : date, duration_seconds,
@@ -952,10 +938,6 @@ class GlossyIssTransitCard extends HTMLElement {
     this._ok = true;
     const sh = this.shadowRoot;
     sh.innerHTML = '';
-    const lnk = document.createElement('link');
-    lnk.rel = 'stylesheet';
-    lnk.href = 'https://fonts.googleapis.com/css2?family=Orbitron:wght@700;800&family=Rajdhani:wght@400;600&display=swap';
-    sh.appendChild(lnk);
     const st = document.createElement('style');
     st.textContent = _IT_CSS;
     sh.appendChild(st);
@@ -1194,9 +1176,8 @@ class GlossyIssTransitCardEditor extends HTMLElement {
 define('glossy-iss-transit-card-editor', GlossyIssTransitCardEditor);
 
 /**
- * GLOSSY LAUNCH CARD — Prochain lancement (Next Launch)
+ * PROCHAIN LANCEMENT — Prochain lancement (Next Launch)
  * type: custom:glossy-launch-card
- * Thème HC3 Fibaro Glossy
  *
  * Pensée pour l'intégration HACS "Next Launch" (plusieurs capteurs :
  * infos générales, mission, date, probabilité météo, statut).
@@ -1323,10 +1304,6 @@ class GlossyLaunchCard extends HTMLElement {
     this._ok = true;
     const sh = this.shadowRoot;
     sh.innerHTML = '';
-    const lnk = document.createElement('link');
-    lnk.rel = 'stylesheet';
-    lnk.href = 'https://fonts.googleapis.com/css2?family=Orbitron:wght@700;800&family=Rajdhani:wght@400;600&display=swap';
-    sh.appendChild(lnk);
     const st = document.createElement('style');
     st.textContent = _LC_CSS;
     sh.appendChild(st);
@@ -1533,7 +1510,7 @@ define('glossy-launch-card-editor', GlossyLaunchCardEditor);
 
 // ── Tableau de bord complet (les quatre cartes en une) ──────────────────
 const _GS_CSS = _ISS_THEME_CSS + `
-:host{display:block;font-family:var(--g-font);color:var(--g-text);font-size:16px;--orange:var(--g-acc);--amber:var(--g-acc2);--muted:color-mix(in srgb,var(--g-muted) 62%,transparent);--ok:#22dd88;--err:#ff4466;--panel:var(--g-panel)}
+:host{display:block;font-family:var(--g-font);color:var(--g-text);font-size:16px;--acc:var(--g-acc);--amber:var(--g-acc2);--muted:color-mix(in srgb,var(--g-muted) 62%,transparent);--ok:#22dd88;--err:#ff4466;--panel:var(--g-panel)}
 *{box-sizing:border-box}.shell{container-type:inline-size;position:relative;overflow:hidden;padding:10px;border:1px solid color-mix(in srgb,var(--g-edge) 20%,transparent);border-radius:18px;background:var(--g-grad);box-shadow:inset 0 1px rgba(255,255,255,.06),0 10px 32px rgba(0,0,0,.55)}
 .shell:before{content:'';position:absolute;inset:0 0 auto;height:2px;background:linear-gradient(90deg,transparent,var(--g-acc),transparent);opacity:.8}.top{position:relative;z-index:1;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 12px;margin-bottom:10px;border:1px solid color-mix(in srgb,var(--g-edge) 22%,transparent);border-top:2px solid color-mix(in srgb,var(--g-acc) 65%,transparent);border-radius:12px;background:var(--g-grad)}.brand{display:flex;align-items:center;gap:10px;color:var(--amber)}.brand ha-icon{--mdc-icon-size:21px}.brand strong{font:700 13px var(--g-font-t);letter-spacing:1px}.top-status{color:var(--ok);font:12px var(--g-font-m)}.top-status.bad{color:var(--err)}.grid{position:relative;z-index:1;display:grid;grid-template-columns:minmax(0,1.2fr) minmax(280px,.8fr);gap:10px}.left,.right{display:flex;flex-direction:column;gap:10px}.panel{position:relative;overflow:hidden;padding:15px;border:1px solid color-mix(in srgb,var(--g-edge) 20%,transparent);border-radius:14px;background:var(--g-panel);box-shadow:inset 0 1px rgba(255,255,255,.04)}.section-title{display:flex;align-items:center;gap:8px;margin-bottom:11px;padding-bottom:6px;border-bottom:1px solid color-mix(in srgb,var(--g-edge) 24%,transparent);color:color-mix(in srgb,var(--g-acc) 90%,transparent);font:600 11px var(--g-font-t);letter-spacing:1.6px;text-transform:uppercase}.section-title:after{content:'';flex:1;height:1px;background:color-mix(in srgb,var(--g-edge) 18%,transparent)}.tracker-bar{display:flex;align-items:center;gap:9px;margin-bottom:8px;color:var(--amber);font:700 12px var(--g-font-t);letter-spacing:1px}.tracker-bar .coords{margin-left:auto;color:var(--ok);font:12px var(--g-font-m);letter-spacing:0}.map{position:relative;width:100%;height:260px;overflow:hidden;border-radius:11px;background:var(--g-deep)}.map-empty{height:100%;display:grid;place-items:center;text-align:center;padding:20px;color:var(--muted);font-size:13px}.tiles{position:absolute;inset:0}.tiles img{position:absolute;width:256px;height:256px;max-width:none;user-select:none;pointer-events:none}.dot{position:absolute;left:50%;top:50%;width:16px;height:16px;margin:-8px 0 0 -8px;border-radius:50%;background:var(--dc,#22dd88);box-shadow:0 0 0 4px color-mix(in srgb,var(--dc,#22dd88) 25%,transparent),0 0 14px var(--dc,#22dd88)}.attr{position:absolute;right:6px;bottom:4px;font-size:9px;color:color-mix(in srgb,var(--g-muted) 60%,transparent);background:color-mix(in srgb,var(--g-deep) 60%,transparent);padding:1px 5px;border-radius:4px}.attr a{color:inherit;text-decoration:none}@keyframes gs-blink{0%,100%{opacity:1}50%{opacity:.35}}.panel.imminent{background:rgba(255,68,102,.08);border:2px solid rgba(255,68,102,.9);box-shadow:inset 0 0 4px rgba(255,68,102,.8),inset 0 0 10px rgba(255,68,102,.35)}.panel.imminent .launch-date{color:var(--err);animation:gs-blink 1s infinite}.statline{display:flex;justify-content:space-between;gap:10px;margin-top:9px;color:var(--muted);font-size:12px}.statline b{color:var(--g-text)}.good{color:var(--ok)!important}.bad{color:var(--err)!important}.warn{color:var(--amber)!important}.pass p{margin:4px 0;color:var(--muted);font-size:13px;line-height:1.45}.pass strong{color:var(--amber)}.pass+.pass{margin-top:12px;padding-top:10px;border-top:1px solid color-mix(in srgb,var(--g-edge) 15%,transparent)}.graph-now{color:var(--g-text);font:800 20px var(--g-font-t)}.graph-unit{margin-left:5px;color:var(--muted);font-size:11px}.graph{width:100%;height:55px;margin-top:6px}.launch-provider{color:var(--amber);font:700 11px var(--g-font-t);letter-spacing:1px;text-transform:uppercase}.launch-mission{margin-top:3px;color:var(--g-text);font-size:18px;font-weight:700}.launch-date{margin-top:8px;color:var(--amber);font:700 13px var(--g-font-t)}.launch-info{margin-top:8px;color:var(--muted);font-size:12px;line-height:1.4}.launch-stats{display:flex;flex-direction:column;gap:5px;margin:10px 0;padding:9px 0;border-top:1px solid color-mix(in srgb,var(--g-edge) 14%,transparent);border-bottom:1px solid color-mix(in srgb,var(--g-edge) 14%,transparent);font-size:13px}.launch-stats div{display:flex;justify-content:space-between;gap:8px}.launch-desc{color:var(--muted);font-size:11px;line-height:1.35}.transit-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}.transit{padding:12px;border:1px solid color-mix(in srgb,var(--g-edge) 20%,transparent);border-radius:11px;background:rgba(255,255,255,.025)}.transit h4{display:flex;align-items:center;gap:7px;margin:0 0 9px;color:var(--amber);font:700 11px var(--g-font-t);letter-spacing:.7px}.transit.lunar h4{color:#8ab4ff}.transit-date{font:700 13px var(--g-font-t);line-height:1.35}.transit-count{display:inline-block;margin-top:7px;padding:3px 8px;border:1px solid color-mix(in srgb,var(--g-edge) 20%,transparent);border-radius:20px;color:var(--amber);font-size:11px}.metrics{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:10px}.metric{padding:7px 4px;text-align:center;border:1px solid color-mix(in srgb,var(--g-edge) 14%,transparent);border-radius:8px;background:rgba(255,255,255,.03)}.metric small{display:block;color:var(--muted);font-size:9px;text-transform:uppercase}.metric b{font:700 12px var(--g-font-t)}.empty{padding:12px;color:var(--muted);font-size:12px;text-align:center}.footer{position:relative;z-index:1;display:flex;justify-content:space-between;gap:10px;margin-top:9px;padding:2px 4px;color:color-mix(in srgb,var(--g-muted) 42%,transparent);font:10px var(--g-font-m);letter-spacing:.5px}/* selon la largeur de la carte, pas de l'écran : une carte dans une colonne étroite se met sur une colonne */@container (max-width:760px){.grid{grid-template-columns:1fr}.map{height:230px}}@container (max-width:420px){.top{align-items:flex-start;flex-direction:column}.tracker-bar{flex-wrap:wrap}.tracker-bar .coords{margin-left:0;flex-basis:100%}.transit-grid{grid-template-columns:1fr}.footer{flex-direction:column}}
 `;
@@ -1551,7 +1528,7 @@ class GlossySpaceDashboardCard extends HTMLElement{
  static getStubConfig(){return {title:'SPACE OPERATIONS',tracker:{entity:''},passes:{},launch:{entity:''},transits:{}}}
  set hass(h){this._h=h;if(!this._config)return;_issTheme(this,this._config.theme,h);const t=this._config.tracker||{};let cleaned=false;for(const key of ['lat_entity','lon_entity']){if(t[key]&&!h.states[t[key]]){t[key]='';cleaned=true}}if(cleaned)this._config={...this._config,tracker:{...t}};if(!this._ok)this._init();const ids=this._ids();const fp=ids.map(id=>{const s=h.states[id];return id+'|'+(s?.state||'x')+'|'+JSON.stringify(s?.attributes||{})}).join('||');if(fp===this._fp)return;this._fp=fp;this._update()}
  _ids(){const c=this._config||{};return [c.tracker.entity,c.tracker.status_entity,c.passes.visible_readable_entity,c.passes.visible_attrs_entity,c.passes.global_readable_entity,c.passes.global_attrs_entity,c.passes.distance_entity,c.launch.entity,c.launch.mission_entity,c.launch.date_entity,c.launch.probability_entity,c.launch.status_entity,c.transits.solar_entity,c.transits.lunar_entity].filter(Boolean)}
- _init(){this._ok=true;const sh=this.shadowRoot;sh.innerHTML=`<style>${_GS_CSS}</style><div class="shell"><div class="top"><div class="brand"><ha-icon icon="mdi:satellite-variant"></ha-icon><strong id="title"></strong></div><span class="top-status" id="top-status">SYSTEM READY</span></div><div class="grid"><div class="left"><div class="panel" id="tracker-panel"></div><div class="panel" id="passes-panel"></div></div><div class="right"><div class="panel" id="launch-panel"></div><div class="panel" id="transits-panel"></div></div></div><div class="footer"><span>LIVE SPACE TELEMETRY</span><span>GLOSSY HC3 / HOME ASSISTANT</span></div></div>`;this._w=sh.querySelector('.shell');this._build();if(!this._tick)this._tick=setInterval(()=>this._h&&this._updateLaunch(),30000)}
+ _init(){this._ok=true;const sh=this.shadowRoot;sh.innerHTML=`<style>${_GS_CSS}</style><div class="shell"><div class="top"><div class="brand"><ha-icon icon="mdi:satellite-variant"></ha-icon><strong id="title"></strong></div><span class="top-status" id="top-status">SYSTEM READY</span></div><div class="grid"><div class="left"><div class="panel" id="tracker-panel"></div><div class="panel" id="passes-panel"></div></div><div class="right"><div class="panel" id="launch-panel"></div><div class="panel" id="transits-panel"></div></div></div><div class="footer"><span>LIVE SPACE TELEMETRY</span><span>HOME ASSISTANT</span></div></div>`;this._w=sh.querySelector('.shell');this._build();if(!this._tick)this._tick=setInterval(()=>this._h&&this._updateLaunch(),30000)}
  _build(){if(!this._w)return;this._w.querySelector('#title').textContent=this._config.title;this._buildTracker();this._buildPasses();this._buildLaunch();this._buildTransits()}
  _buildTracker(){const c=this._config.tracker||{};const el=this._w.querySelector('#tracker-panel');if(!c.entity){el.innerHTML='<div class="section-title">ISS TRACKER</div><div class="empty">Aucune entité tracker configurée</div>';return}el.innerHTML='<div class="tracker-bar"><ha-icon icon="mdi:satellite-variant"></ha-icon><span>ISS TRACKER</span><span class="coords" id="tracker-coords">—</span></div><div class="map" id="map"><div class="map-empty">Position en attente…</div></div><div class="statline"><span>STATUS</span><b id="tracker-status">—</b><span>ZOOM <b id="tracker-zoom">—</b></span></div>';this._pos=null}
  _buildPasses(){const c=this._config.passes||{};const el=this._w.querySelector('#passes-panel');let html='<div class="section-title">PASSAGES ISS</div>';if(c.visible_readable_entity)html+='<div class="pass" id="pass-visible"></div>';if(c.global_readable_entity)html+='<div class="pass" id="pass-global"></div>';if(c.distance_entity)html+='<div class="pass" id="distance-box"><div><span class="graph-now" id="distance-now">—</span><span class="graph-unit">km</span></div><svg class="graph" id="distance-graph" viewBox="0 0 300 55" preserveAspectRatio="none"></svg></div>';if(!c.visible_readable_entity&&!c.global_readable_entity&&!c.distance_entity)html+='<div class="empty">Aucune donnée de passage configurée</div>';el.innerHTML=html}
@@ -1594,15 +1571,15 @@ define('glossy-space-dashboard-card-editor', GlossySpaceDashboardCardEditor);
 
 window.customCards = window.customCards || [];
 for (const card of [
-  { type: 'glossy-iss-tracker-card', name: 'Glossy ISS Tracker Card', description: "Position de l'ISS en direct avec petite carte · HC3 Fibaro" },
-  { type: 'glossy-iss-passes-card', name: 'Glossy ISS Passes Card', description: 'Prochains passages ISS (visible/global) + graphique de distance · HC3 Fibaro' },
-  { type: 'glossy-iss-transit-card', name: 'Glossy ISS Transit Card', description: 'Prochains transits ISS devant le Soleil et la Lune · HC3 Fibaro' },
-  { type: 'glossy-space-dashboard-card', name: 'Glossy Space Dashboard Card', description: 'Tableau de bord complet : ISS, passages, lancement et transits · HC3 Fibaro' },
-  { type: 'glossy-launch-card', name: 'Glossy Launch Card', description: 'Prochain lancement (Next Launch) : mission, compte à rebours, pad, météo, statut · HC3 Fibaro' },
+  { type: 'glossy-iss-tracker-card', name: 'ISS Tracker', description: "Position de l'ISS en direct sur une mini-carte" },
+  { type: 'glossy-iss-passes-card', name: 'Passages ISS', description: 'Prochains passages ISS (visible et global) et graphique de la distance' },
+  { type: 'glossy-iss-transit-card', name: 'Transits ISS', description: 'Prochains transits de l\'ISS devant le Soleil et la Lune' },
+  { type: 'glossy-space-dashboard-card', name: 'Space Operations', description: 'Tableau de bord complet : ISS, passages, lancement et transits' },
+  { type: 'glossy-launch-card', name: 'Prochain lancement', description: 'Prochain lancement (Next Launch) : mission, compte à rebours, pas de tir, météo, statut' },
 ]) if (!window.customCards.some((c) => c.type === card.type)) window.customCards.push({ ...card, preview: true });
 
 console.info(
   `%c CARTES ISS %c ${CARD_VERSION} `,
-  'background:#e6750a;color:#1a1a1a;font-weight:bold;',
-  'background:#1a1a1a;color:#e6750a;'
+  'background:#1d93e3;color:#fff;font-weight:bold;',
+  'background:#1a2434;color:#7cc4ff;'
 );
