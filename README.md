@@ -88,8 +88,6 @@ Option commune à toutes les cartes, `theme` (« Couleurs de la carte » dans l'
 2. **Paramètres → Tableaux de bord → ⋮ → Ressources → Ajouter une ressource** : URL `/local/iss-cards.js`, type **Module JavaScript**.
 3. Rechargez la page (Ctrl+F5).
 
-> Vous aviez les fichiers séparés (`glossy-iss-tracker-card.js`, `glossy-space-dashboard-card.js`…) ? Les types de carte n'ont pas changé : supprimez simplement les anciennes ressources et gardez celle-ci. Vos tableaux de bord restent tels quels.
-
 ## Opérations spatiales — `custom:glossy-space-dashboard-card`
 
 Les quatre cartes en un seul tableau de bord : bandeau de titre, suivi de l’ISS (avec l’état du signal et le niveau de zoom), passages, prochain lancement et transits. Sur deux colonnes quand la carte est large, sur une seule quand elle est étroite (colonne d'un tableau de bord, téléphone).
