@@ -112,7 +112,8 @@ type: custom:glossy-iss-tracker-card
 
 - Position de l'ISS (latitude et longitude) dans le bandeau, **en vert** quand le capteur répond, **en rouge clignotant** quand le signal est perdu.
 - **Mini-carte** centrée sur l'ISS, **sans clé** : fond vectoriel [OpenFreeMap](https://openfreemap.org/) (gratuit, sans clé), sombre ou clair selon le thème, affiché avec MapLibre GL livré avec les cartes (aucun CDN). Une clé gratuite [Stadia Maps](https://client.stadiamaps.com/) ou [CARTO](https://carto.com/basemaps/apikey) reste possible pour leurs propres fonds. Les fonds CARTO sans clé, ceux de la carte de Home Assistant, ne sont plus utilisés : ils portent désormais un filigrane « API KEY REQUIRED » ([home-assistant/frontend#53800](https://github.com/home-assistant/frontend/issues/53800)).
-- **Zoom** : boutons **+** et **−**, **Ctrl + molette** (⌘ sur Mac ; la molette seule fait défiler la page), **pincement** à deux doigts ou double-clic. La carte reste centrée sur l'ISS au zoom choisi.
+- **Zoom** : boutons **+** et **−**, **Ctrl + molette** (⌘ sur Mac ; la molette seule fait défiler la page), **pincement** à deux doigts ou double-clic.
+- **Déplacement** : cliquer-glisser à la souris, ou deux doigts sur écran tactile. La carte cesse alors de suivre l'ISS, dont le point reste à sa vraie place ; le bouton **◎** recentre et reprend le suivi, qui reprend aussi seul après une minute sans toucher la carte.
 
 | Option | Rôle | Défaut |
 | --- | --- | --- |

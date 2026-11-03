@@ -10,7 +10,7 @@
  *   custom:glossy-space-dashboard-card  les quatre en un seul tableau de bord
  */
 
-const CARD_VERSION = "0.7.0-beta.3";
+const CARD_VERSION = "0.7.0-beta.4";
 
 // Enregistrement sans erreur si une ancienne copie de la carte est encore
 // chargée comme ressource à côté de celle de HACS.
@@ -593,7 +593,7 @@ const _IS_CSS = _ISS_THEME_CSS + `
   .tiles{position:absolute;inset:0;}
   /* MapLibre donne position:relative à son conteneur : la carte aurait une hauteur nulle */
   .vmap{position:absolute!important;inset:0;}
-  .zbtn{position:absolute;top:8px;right:8px;z-index:2;display:flex;flex-direction:column;gap:4px}.zbtn button{width:28px;height:28px;padding:0;border-radius:8px;border:1px solid color-mix(in srgb,var(--g-edge) 35%,transparent);background:color-mix(in srgb,var(--g-deep) 80%,transparent);color:var(--g-text);font:600 17px/1 var(--g-font);cursor:pointer}.zbtn button:hover{border-color:var(--g-acc);color:var(--g-acc2)}.zbtn button:focus-visible{outline:2px solid var(--g-acc);outline-offset:1px}
+  .zbtn{position:absolute;top:8px;right:8px;z-index:2;display:flex;flex-direction:column;gap:4px}.zbtn button{width:28px;height:28px;padding:0;border-radius:8px;border:1px solid color-mix(in srgb,var(--g-edge) 35%,transparent);background:color-mix(in srgb,var(--g-deep) 80%,transparent);color:var(--g-text);font:600 17px/1 var(--g-font);cursor:pointer}.zbtn button:hover{border-color:var(--g-acc);color:var(--g-acc2)}.zbtn button:focus-visible{outline:2px solid var(--g-acc);outline-offset:1px}.zbtn button.zc{font-size:15px}.free .zbtn button.zc{color:var(--g-acc2);border-color:var(--g-acc)}.tiles{cursor:grab}.drag .tiles{cursor:grabbing}.vmap .maplibregl-canvas-container{cursor:grab}
   .tiles img{position:absolute;width:256px;height:256px;max-width:none;user-select:none;pointer-events:none;}
   .dot{
     position:absolute;left:50%;top:50%;width:16px;height:16px;margin:-8px 0 0 -8px;border-radius:50%;
@@ -621,7 +621,18 @@ const _issZoom = (span) => Math.max(1, Math.min(10, Math.round(Math.log2(360 / (
 const _issZ = (owner, span) => (owner._uz != null ? owner._uz : _issZoom(span));
 const _ISS_ZMIN = 1, _ISS_ZMAX = 12;
 /** Boutons + et − de la mini-carte (délégation sur le conteneur, posée une seule fois). */
-const _issZoomButtons = '<div class="zbtn"><button type="button" data-z="1" title="Zoomer" aria-label="Zoomer">+</button><button type="button" data-z="-1" title="Dézoomer" aria-label="Dézoomer">−</button></div>';
+const _issZoomButtons = '<div class="zbtn"><button type="button" data-z="1" title="Zoomer" aria-label="Zoomer">+</button><button type="button" data-z="-1" title="Dézoomer" aria-label="Dézoomer">−</button><button type="button" data-z="0" class="zc" title="Recentrer sur l\'ISS et la suivre" aria-label="Recentrer sur l\'ISS">◎</button></div>';
+// Suivi de l'ISS : interrompu quand on déplace la carte, repris avec ◎ ou après une minute sans y toucher.
+const _ISS_FOLLOW_RESUME = 60000;
+const _issFollowing = (owner, wrap) => {
+  if (owner._follow === false && Date.now() - (owner._touched || 0) > _ISS_FOLLOW_RESUME) { owner._follow = true; owner._center = null; }
+  const f = owner._follow !== false;
+  if (wrap) wrap.classList.toggle('free', !f);
+  return f;
+};
+const _issStopFollow = (owner, wrap) => { owner._follow = false; owner._touched = Date.now(); if (wrap) wrap.classList.add('free'); };
+/** Point vert à sa vraie place (x, y en pixels dans la mini-carte). */
+const _issPlaceDot = (wrap, x, y) => { const d = wrap.querySelector('.dot'); if (d) { d.style.left = `${Math.round(x)}px`; d.style.top = `${Math.round(y)}px`; } };
 const _issBindZoom = (owner, wrap, span, redraw) => {
   if (wrap._issZoomBound) return;
   wrap._issZoomBound = true;
@@ -630,10 +641,12 @@ const _issBindZoom = (owner, wrap, span, redraw) => {
     if (!b) return;
     e.stopPropagation();
     const raster = !!wrap.querySelector('.tiles');
+    if (b.dataset.z === '0') { owner._follow = true; owner._center = null; redraw(); return; }
     let z = _issZ(owner, span()) + Number(b.dataset.z);
     z = Math.max(_ISS_ZMIN, Math.min(raster ? 10 : _ISS_ZMAX, raster ? Math.round(z) : z));
     owner._uz = z;
     if (!raster && owner._vmap) owner._vmap.easeTo({ zoom: Math.max(0, z - 1), duration: 250 });
+    if (owner._follow === false) owner._touched = Date.now();
     redraw();
   });
 };
@@ -660,7 +673,38 @@ const _issLoadMaps = () => {
  * Mini-carte vectorielle (OpenFreeMap) dans `wrap` (qui contient un <div class="vmap">), centrée sur
  * (lat, lon) au zoom z des tuiles 256 px. `owner` garde l'instance MapLibre (owner._vmap).
  */
+/** Tuiles (avec clé) : centre = l'ISS quand la carte la suit, sinon le centre choisi en glissant à la souris. */
+const _issRaster = (owner, wrap, lat, lon, z, tileUrl, redraw) => {
+  const layer = wrap.querySelector('.tiles'), W = wrap.offsetWidth, H = wrap.offsetHeight;
+  if (!layer || !W || !H) return;
+  const follow = _issFollowing(owner, wrap), c = !follow && owner._center ? owner._center : { lat, lon };
+  layer.innerHTML = _issTilesHtml(c.lat, c.lon, z, W, H, tileUrl);
+  const n = 256 * 2 ** z, a = _issWorldPx(lat, lon, z), o = _issWorldPx(c.lat, c.lon, z);
+  const dx = ((a.x - o.x + n / 2) % n + n) % n - n / 2; // le plus court chemin autour du monde
+  _issPlaceDot(wrap, W / 2 + dx, H / 2 + a.y - o.y);
+  if (wrap._issPanBound) return;
+  wrap._issPanBound = true;
+  let start = null;
+  wrap.addEventListener('pointerdown', (e) => {
+    if (e.pointerType !== 'mouse' || e.button !== 0 || e.target.closest('.zbtn, .attr') || !wrap.querySelector('.tiles')) return;
+    const zz = owner._rz, cc = owner._follow === false && owner._center ? owner._center : owner._iss;
+    if (!cc || zz == null) return;
+    start = { x: e.clientX, y: e.clientY, p: _issWorldPx(cc.lat, cc.lon, zz), z: zz };
+    wrap.setPointerCapture(e.pointerId); wrap.classList.add('drag');
+  });
+  wrap.addEventListener('pointermove', (e) => {
+    if (!start) return;
+    const n2 = 256 * 2 ** start.z, x = start.p.x - (e.clientX - start.x), y = Math.max(0, Math.min(n2, start.p.y - (e.clientY - start.y)));
+    _issStopFollow(owner, wrap);
+    owner._center = { lon: ((((x / n2) * 360) % 360) + 360) % 360 - 180, lat: Math.atan(Math.sinh(Math.PI * (1 - 2 * y / n2))) * 180 / Math.PI };
+    redraw();
+  });
+  const end = () => { start = null; wrap.classList.remove('drag'); };
+  wrap.addEventListener('pointerup', end); wrap.addEventListener('pointercancel', end);
+};
+
 const _issVector = async (owner, wrap, lat, lon, z, light) => {
+  owner._iss = { lat, lon };
   const lib = await _issLoadMaps();
   const host = wrap.querySelector('.vmap');
   if (!host || !host.isConnected) return;
@@ -674,28 +718,31 @@ const _issVector = async (owner, wrap, lat, lon, z, light) => {
   if (!m) {
     m = new lib.maplibregl.Map({
       container: host, style, center: [lon, lat], zoom, attributionControl: false, fadeDuration: 0,
-      // zoom seulement (la carte suit l'ISS) ; molette avec Ctrl pour laisser défiler la page
-      dragPan: false, dragRotate: false, keyboard: false, boxZoom: false, touchPitch: false, cooperativeGestures: true,
+      // déplacement et zoom ; molette avec Ctrl et deux doigts sur écran tactile, pour laisser défiler la page
+      dragRotate: false, keyboard: false, boxZoom: false, touchPitch: false, cooperativeGestures: true,
       minZoom: _ISS_ZMIN - 1, maxZoom: _ISS_ZMAX - 1,
       locale: {
         'CooperativeGesturesHandler.WindowsHelpText': 'Ctrl + molette pour zoomer',
         'CooperativeGesturesHandler.MacHelpText': '⌘ + molette pour zoomer',
-        'CooperativeGesturesHandler.MobileHelpText': 'Deux doigts pour zoomer',
+        'CooperativeGesturesHandler.MobileHelpText': 'Deux doigts pour déplacer ou zoomer',
       },
     });
-    m.scrollZoom.enable({ around: 'center' });
-    m.touchZoomRotate.enable({ around: 'center' }); m.touchZoomRotate.disableRotation();
+    m.touchZoomRotate.disableRotation();
     m.doubleClickZoom.enable();
+    m.on('dragstart', () => _issStopFollow(owner, wrap));
+    m.on('move', () => { const p = owner._iss && m.project([owner._iss.lon, owner._iss.lat]); if (p) _issPlaceDot(wrap, p.x, p.y); });
     // tout zoom qui ne vient pas du suivi de l'ISS est celui de l'utilisateur : il est gardé
     m.on('zoomend', () => { if (!m._issProg) { owner._uz = m.getZoom() + 1; if (owner._onZoom) owner._onZoom(); } });
     m._issStyle = style; owner._vmap = m;
     m._issProg = true; m.once('load', () => { m._issProg = false; });
+    _issFollowing(owner, wrap);
     m.on('styledata', () => _issFrenchLabels(m));
   } else {
     if (m._issStyle !== style) { m.setStyle(style); m._issStyle = style; }
     m.resize();
-    if (!m.isZooming()) { m._issProg = true; m.jumpTo({ center: [lon, lat], zoom }); m._issProg = false; }
+    if (_issFollowing(owner, wrap) && !m.isZooming() && !m.isMoving()) { m._issProg = true; m.jumpTo({ center: [lon, lat], zoom }); m._issProg = false; }
   }
+  { const p = m.project([lon, lat]); _issPlaceDot(wrap, p.x, p.y); }
 };
 /** Noms de lieux en français (sinon en alphabet latin, sinon le nom local) sur toutes les couches de texte. */
 const _issFrenchLabels = (m) => {
@@ -749,7 +796,7 @@ class GlossyIssTrackerCard extends HTMLElement {
       carto_api_key: config.carto_api_key || '',
       stadia_api_key: config.stadia_api_key || '',
     };
-    this._uz = null;
+    this._uz = null; this._follow = true; this._center = null;
     // nouvelle config : tout réafficher au prochain passage de hass
     this._fp = null;
     if (this._ok) { this._buildDom(); if (this._h) this.hass = this._h; }
@@ -883,13 +930,11 @@ class GlossyIssTrackerCard extends HTMLElement {
         .catch((e) => { _issDropVector(this); mapWrap.innerHTML = `<div class="map-empty">Carte indisponible : ${this._esc(e.message)}</div>`; });
       return;
     }
-    const layer = mapWrap && mapWrap.querySelector('.tiles');
-    if (!layer || !this._pos) return;
-    const W = mapWrap.offsetWidth, H = mapWrap.offsetHeight;
-    if (!W || !H) return;
-    const { lat, lon, color, tileUrl } = this._pos;
-    layer.innerHTML = _issTilesHtml(lat, lon, Math.round(Math.min(10, _issZ(this, this._config.zoom_span))), W, H, tileUrl);
+    if (!mapWrap || !this._pos) return;
+    const { lat, lon, color, tileUrl } = this._pos, z = Math.round(Math.min(10, _issZ(this, this._config.zoom_span)));
+    this._iss = { lat, lon }; this._rz = z;
     mapWrap.querySelector('.dot')?.style.setProperty('--dc', color);
+    _issRaster(this, mapWrap, lat, lon, z, tileUrl, () => this._drawTiles());
   }
 }
 
@@ -2155,7 +2200,7 @@ define('glossy-launch-card-editor', GlossyLaunchCardEditor);
 const _GS_CSS = _ISS_THEME_CSS + `
 :host{display:block;font-family:var(--g-font);color:var(--g-text);font-size:16px;--acc:var(--g-acc);--amber:var(--g-acc2);--muted:color-mix(in srgb,var(--g-muted) 62%,transparent);--ok:#22dd88;--err:#ff4466;--panel:var(--g-panel)}
 *{box-sizing:border-box}.shell{container-type:inline-size;position:relative;overflow:hidden;padding:10px;border:1px solid color-mix(in srgb,var(--g-edge) 20%,transparent);border-radius:18px;background:var(--g-grad);box-shadow:inset 0 1px rgba(255,255,255,.06),0 10px 32px rgba(0,0,0,.55)}
-.shell:before{content:'';position:absolute;inset:0 0 auto;height:2px;background:linear-gradient(90deg,transparent,var(--g-acc),transparent);opacity:.8}.top{position:relative;z-index:1;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 12px;margin-bottom:10px;border:1px solid color-mix(in srgb,var(--g-edge) 22%,transparent);border-top:2px solid color-mix(in srgb,var(--g-acc) 65%,transparent);border-radius:12px;background:var(--g-grad)}.brand{display:flex;align-items:center;gap:10px;color:var(--amber)}.brand ha-icon{--mdc-icon-size:21px}.brand strong{font:700 13px var(--g-font-t);letter-spacing:1px}.top-status{color:var(--ok);font:12px var(--g-font-m)}.top-status.bad{color:var(--err)}.grid{position:relative;z-index:1;display:grid;grid-template-columns:minmax(0,1.2fr) minmax(280px,.8fr);gap:10px}.left,.right{display:flex;flex-direction:column;gap:10px}.panel{position:relative;overflow:hidden;padding:15px;border:1px solid color-mix(in srgb,var(--g-edge) 20%,transparent);border-radius:14px;background:var(--g-panel);box-shadow:inset 0 1px rgba(255,255,255,.04)}.section-title{display:flex;align-items:center;gap:8px;margin-bottom:11px;padding-bottom:6px;border-bottom:1px solid color-mix(in srgb,var(--g-edge) 24%,transparent);color:color-mix(in srgb,var(--g-acc) 90%,transparent);font:600 11px var(--g-font-t);letter-spacing:1.6px;text-transform:uppercase}.section-title:after{content:'';flex:1;height:1px;background:color-mix(in srgb,var(--g-edge) 18%,transparent)}.tracker-bar{display:flex;align-items:center;gap:9px;margin-bottom:8px;color:var(--amber);font:700 12px var(--g-font-t);letter-spacing:1px}.tracker-bar .coords{margin-left:auto;color:var(--ok);font:12px var(--g-font-m);letter-spacing:0}.map{position:relative;width:100%;height:260px;overflow:hidden;border-radius:11px;background:var(--g-deep)}.map-empty{height:100%;display:grid;place-items:center;text-align:center;padding:20px;color:var(--muted);font-size:13px}.tiles{position:absolute;inset:0}.vmap{position:absolute!important;inset:0}.zbtn{position:absolute;top:8px;right:8px;z-index:2;display:flex;flex-direction:column;gap:4px}.zbtn button{width:28px;height:28px;padding:0;border-radius:8px;border:1px solid color-mix(in srgb,var(--g-edge) 35%,transparent);background:color-mix(in srgb,var(--g-deep) 80%,transparent);color:var(--g-text);font:600 17px/1 var(--g-font);cursor:pointer}.zbtn button:hover{border-color:var(--g-acc);color:var(--g-acc2)}.zbtn button:focus-visible{outline:2px solid var(--g-acc);outline-offset:1px}.tiles img{position:absolute;width:256px;height:256px;max-width:none;user-select:none;pointer-events:none}.dot{position:absolute;left:50%;top:50%;width:16px;height:16px;margin:-8px 0 0 -8px;border-radius:50%;background:var(--dc,#22dd88);box-shadow:0 0 0 4px color-mix(in srgb,var(--dc,#22dd88) 25%,transparent),0 0 14px var(--dc,#22dd88)}.attr{position:absolute;right:6px;bottom:4px;font-size:9px;color:color-mix(in srgb,var(--g-muted) 60%,transparent);background:color-mix(in srgb,var(--g-deep) 60%,transparent);padding:1px 5px;border-radius:4px}.attr a{color:inherit;text-decoration:none}@keyframes gs-blink{0%,100%{opacity:1}50%{opacity:.35}}.panel.imminent{background:rgba(255,68,102,.08);border:2px solid rgba(255,68,102,.9);box-shadow:inset 0 0 4px rgba(255,68,102,.8),inset 0 0 10px rgba(255,68,102,.35)}.panel.imminent .launch-date{color:var(--err);animation:gs-blink 1s infinite}.statline{display:flex;justify-content:space-between;gap:10px;margin-top:9px;color:var(--muted);font-size:12px}.statline b{color:var(--g-text)}.good{color:var(--ok)!important}.bad{color:var(--err)!important}.warn{color:var(--amber)!important}.pass p{margin:4px 0;color:var(--muted);font-size:13px;line-height:1.45}.pass strong{color:var(--amber)}.pass+.pass{margin-top:12px;padding-top:10px;border-top:1px solid color-mix(in srgb,var(--g-edge) 15%,transparent)}.graph-now{color:var(--g-text);font:800 20px var(--g-font-t)}.graph-unit{margin-left:5px;color:var(--muted);font-size:11px}.graph{width:100%;height:55px;margin-top:6px}.launch-provider{color:var(--amber);font:700 11px var(--g-font-t);letter-spacing:1px;text-transform:uppercase}.launch-mission{margin-top:3px;color:var(--g-text);font-size:18px;font-weight:700}.launch-date{margin-top:8px;color:var(--amber);font:700 13px var(--g-font-t)}.launch-info{margin-top:8px;color:var(--muted);font-size:12px;line-height:1.4}.launch-stats{display:flex;flex-direction:column;gap:5px;margin:10px 0;padding:9px 0;border-top:1px solid color-mix(in srgb,var(--g-edge) 14%,transparent);border-bottom:1px solid color-mix(in srgb,var(--g-edge) 14%,transparent);font-size:13px}.launch-stats div{display:flex;justify-content:space-between;gap:8px}.launch-desc{color:var(--muted);font-size:11px;line-height:1.35}.transit-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}.transit{padding:12px;border:1px solid color-mix(in srgb,var(--g-edge) 20%,transparent);border-radius:11px;background:rgba(255,255,255,.025)}.transit h4{display:flex;align-items:center;gap:7px;margin:0 0 9px;color:var(--amber);font:700 11px var(--g-font-t);letter-spacing:.7px}.transit.lunar h4{color:#8ab4ff}.transit-date{font:700 13px var(--g-font-t);line-height:1.35}.transit-count{display:inline-block;margin-top:7px;padding:3px 8px;border:1px solid color-mix(in srgb,var(--g-edge) 20%,transparent);border-radius:20px;color:var(--amber);font-size:11px}.metrics{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:10px}.metric{padding:7px 4px;text-align:center;border:1px solid color-mix(in srgb,var(--g-edge) 14%,transparent);border-radius:8px;background:rgba(255,255,255,.03)}.metric small{display:block;color:var(--muted);font-size:9px;text-transform:uppercase}.metric b{font:700 12px var(--g-font-t)}.empty{padding:12px;color:var(--muted);font-size:12px;text-align:center}.footer{position:relative;z-index:1;display:flex;justify-content:space-between;gap:10px;margin-top:9px;padding:2px 4px;color:color-mix(in srgb,var(--g-muted) 42%,transparent);font:10px var(--g-font-m);letter-spacing:.5px}/* selon la largeur de la carte, pas de l'écran : une carte dans une colonne étroite se met sur une colonne */@container (max-width:760px){.grid{grid-template-columns:1fr}.map{height:230px}}@container (max-width:420px){.top{align-items:flex-start;flex-direction:column}.tracker-bar{flex-wrap:wrap}.tracker-bar .coords{margin-left:0;flex-basis:100%}.transit-grid{grid-template-columns:1fr}.footer{flex-direction:column}}
+.shell:before{content:'';position:absolute;inset:0 0 auto;height:2px;background:linear-gradient(90deg,transparent,var(--g-acc),transparent);opacity:.8}.top{position:relative;z-index:1;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 12px;margin-bottom:10px;border:1px solid color-mix(in srgb,var(--g-edge) 22%,transparent);border-top:2px solid color-mix(in srgb,var(--g-acc) 65%,transparent);border-radius:12px;background:var(--g-grad)}.brand{display:flex;align-items:center;gap:10px;color:var(--amber)}.brand ha-icon{--mdc-icon-size:21px}.brand strong{font:700 13px var(--g-font-t);letter-spacing:1px}.top-status{color:var(--ok);font:12px var(--g-font-m)}.top-status.bad{color:var(--err)}.grid{position:relative;z-index:1;display:grid;grid-template-columns:minmax(0,1.2fr) minmax(280px,.8fr);gap:10px}.left,.right{display:flex;flex-direction:column;gap:10px}.panel{position:relative;overflow:hidden;padding:15px;border:1px solid color-mix(in srgb,var(--g-edge) 20%,transparent);border-radius:14px;background:var(--g-panel);box-shadow:inset 0 1px rgba(255,255,255,.04)}.section-title{display:flex;align-items:center;gap:8px;margin-bottom:11px;padding-bottom:6px;border-bottom:1px solid color-mix(in srgb,var(--g-edge) 24%,transparent);color:color-mix(in srgb,var(--g-acc) 90%,transparent);font:600 11px var(--g-font-t);letter-spacing:1.6px;text-transform:uppercase}.section-title:after{content:'';flex:1;height:1px;background:color-mix(in srgb,var(--g-edge) 18%,transparent)}.tracker-bar{display:flex;align-items:center;gap:9px;margin-bottom:8px;color:var(--amber);font:700 12px var(--g-font-t);letter-spacing:1px}.tracker-bar .coords{margin-left:auto;color:var(--ok);font:12px var(--g-font-m);letter-spacing:0}.map{position:relative;width:100%;height:260px;overflow:hidden;border-radius:11px;background:var(--g-deep)}.map-empty{height:100%;display:grid;place-items:center;text-align:center;padding:20px;color:var(--muted);font-size:13px}.tiles{position:absolute;inset:0}.vmap{position:absolute!important;inset:0}.zbtn{position:absolute;top:8px;right:8px;z-index:2;display:flex;flex-direction:column;gap:4px}.zbtn button{width:28px;height:28px;padding:0;border-radius:8px;border:1px solid color-mix(in srgb,var(--g-edge) 35%,transparent);background:color-mix(in srgb,var(--g-deep) 80%,transparent);color:var(--g-text);font:600 17px/1 var(--g-font);cursor:pointer}.zbtn button:hover{border-color:var(--g-acc);color:var(--g-acc2)}.zbtn button:focus-visible{outline:2px solid var(--g-acc);outline-offset:1px}.zbtn button.zc{font-size:15px}.free .zbtn button.zc{color:var(--g-acc2);border-color:var(--g-acc)}.tiles{cursor:grab}.drag .tiles{cursor:grabbing}.vmap .maplibregl-canvas-container{cursor:grab}.tiles img{position:absolute;width:256px;height:256px;max-width:none;user-select:none;pointer-events:none}.dot{position:absolute;left:50%;top:50%;width:16px;height:16px;margin:-8px 0 0 -8px;border-radius:50%;background:var(--dc,#22dd88);box-shadow:0 0 0 4px color-mix(in srgb,var(--dc,#22dd88) 25%,transparent),0 0 14px var(--dc,#22dd88)}.attr{position:absolute;right:6px;bottom:4px;font-size:9px;color:color-mix(in srgb,var(--g-muted) 60%,transparent);background:color-mix(in srgb,var(--g-deep) 60%,transparent);padding:1px 5px;border-radius:4px}.attr a{color:inherit;text-decoration:none}@keyframes gs-blink{0%,100%{opacity:1}50%{opacity:.35}}.panel.imminent{background:rgba(255,68,102,.08);border:2px solid rgba(255,68,102,.9);box-shadow:inset 0 0 4px rgba(255,68,102,.8),inset 0 0 10px rgba(255,68,102,.35)}.panel.imminent .launch-date{color:var(--err);animation:gs-blink 1s infinite}.statline{display:flex;justify-content:space-between;gap:10px;margin-top:9px;color:var(--muted);font-size:12px}.statline b{color:var(--g-text)}.good{color:var(--ok)!important}.bad{color:var(--err)!important}.warn{color:var(--amber)!important}.pass p{margin:4px 0;color:var(--muted);font-size:13px;line-height:1.45}.pass strong{color:var(--amber)}.pass+.pass{margin-top:12px;padding-top:10px;border-top:1px solid color-mix(in srgb,var(--g-edge) 15%,transparent)}.graph-now{color:var(--g-text);font:800 20px var(--g-font-t)}.graph-unit{margin-left:5px;color:var(--muted);font-size:11px}.graph{width:100%;height:55px;margin-top:6px}.launch-provider{color:var(--amber);font:700 11px var(--g-font-t);letter-spacing:1px;text-transform:uppercase}.launch-mission{margin-top:3px;color:var(--g-text);font-size:18px;font-weight:700}.launch-date{margin-top:8px;color:var(--amber);font:700 13px var(--g-font-t)}.launch-info{margin-top:8px;color:var(--muted);font-size:12px;line-height:1.4}.launch-stats{display:flex;flex-direction:column;gap:5px;margin:10px 0;padding:9px 0;border-top:1px solid color-mix(in srgb,var(--g-edge) 14%,transparent);border-bottom:1px solid color-mix(in srgb,var(--g-edge) 14%,transparent);font-size:13px}.launch-stats div{display:flex;justify-content:space-between;gap:8px}.launch-desc{color:var(--muted);font-size:11px;line-height:1.35}.transit-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}.transit{padding:12px;border:1px solid color-mix(in srgb,var(--g-edge) 20%,transparent);border-radius:11px;background:rgba(255,255,255,.025)}.transit h4{display:flex;align-items:center;gap:7px;margin:0 0 9px;color:var(--amber);font:700 11px var(--g-font-t);letter-spacing:.7px}.transit.lunar h4{color:#8ab4ff}.transit-date{font:700 13px var(--g-font-t);line-height:1.35}.transit-count{display:inline-block;margin-top:7px;padding:3px 8px;border:1px solid color-mix(in srgb,var(--g-edge) 20%,transparent);border-radius:20px;color:var(--amber);font-size:11px}.metrics{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:10px}.metric{padding:7px 4px;text-align:center;border:1px solid color-mix(in srgb,var(--g-edge) 14%,transparent);border-radius:8px;background:rgba(255,255,255,.03)}.metric small{display:block;color:var(--muted);font-size:9px;text-transform:uppercase}.metric b{font:700 12px var(--g-font-t)}.empty{padding:12px;color:var(--muted);font-size:12px;text-align:center}.footer{position:relative;z-index:1;display:flex;justify-content:space-between;gap:10px;margin-top:9px;padding:2px 4px;color:color-mix(in srgb,var(--g-muted) 42%,transparent);font:10px var(--g-font-m);letter-spacing:.5px}/* selon la largeur de la carte, pas de l'écran : une carte dans une colonne étroite se met sur une colonne */@container (max-width:760px){.grid{grid-template-columns:1fr}.map{height:230px}}@container (max-width:420px){.top{align-items:flex-start;flex-direction:column}.tracker-bar{flex-wrap:wrap}.tracker-bar .coords{margin-left:0;flex-basis:100%}.transit-grid{grid-template-columns:1fr}.footer{flex-direction:column}}
 `;
 
 function _gsEsc(v){return (v??'').toString().replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
@@ -2165,7 +2210,7 @@ const _gsDuration=_issDuration;
 
 class GlossySpaceDashboardCard extends HTMLElement{
  constructor(){super();this.attachShadow({mode:'open'});this._ok=false;this._h=null;this._resize=null;this._history=null;this._historyAt=0}
- setConfig(c){c=c||{};this._config={theme:c.theme||'v2',title:c.title||'SPACE OPERATIONS',tracker:{...(c.tracker||{}),lat_entity:'',lon_entity:''},passes:{...(c.passes||{})},launch:{...(c.launch||{})},transits:{...(c.transits||{})}};this._fp=null;this._history=null;this._uz=null;this._onZoom=()=>this._showZoom();if(this._ok){this._build();if(this._h)this.hass=this._h}}
+ setConfig(c){c=c||{};this._config={theme:c.theme||'v2',title:c.title||'SPACE OPERATIONS',tracker:{...(c.tracker||{}),lat_entity:'',lon_entity:''},passes:{...(c.passes||{})},launch:{...(c.launch||{})},transits:{...(c.transits||{})}};this._fp=null;this._history=null;this._uz=null;this._follow=true;this._center=null;this._onZoom=()=>this._showZoom();if(this._ok){this._build();if(this._h)this.hass=this._h}}
  getCardSize(){return 8}
  static getConfigElement(){return document.createElement('glossy-space-dashboard-card-editor')}
  static getStubConfig(){return {title:'SPACE OPERATIONS',tracker:{entity:''},passes:{},launch:{entity:''},transits:{}}}
@@ -2182,7 +2227,7 @@ class GlossySpaceDashboardCard extends HTMLElement{
  _update(){if(!this._h)return;this._updateTracker();this._updatePasses();this._updateLaunch();this._updateTransits()}
  _updateTracker(){const c=this._config.tracker||{},s=this._h.states,live=!c.entity?_issLive.position():null,main=c.entity?s[c.entity]:null,status=s[c.status_entity||c.entity],bad=c.entity?(!status||['unknown','unavailable'].includes(status.state)):!(live&&_issLive.fresh());if(!c.entity)_ISS.load();const lat0=live?live.lat:main?.attributes?.latitude,lon0=live?live.lon:main?.attributes?.longitude;const lat=Number(lat0),lon=Number(lon0),has=Number.isFinite(lat)&&Number.isFinite(lon)&&!(lat===0&&lon===0);const statusEl=this._w.querySelector('#tracker-status'),coordEl=this._w.querySelector('#tracker-coords');if(statusEl){statusEl.textContent=bad?'SIGNAL LOST':'SIGNAL LOCKED';statusEl.className=bad?'bad':'good'}if(coordEl)coordEl.textContent=has?`Lat: ${lat.toFixed(2)} | Lon: ${lon.toFixed(2)}`:'—';const zEl=this._w.querySelector('#tracker-zoom');if(zEl)zEl.textContent=String(Math.round(_issZ(this,c.zoom_span)));const map=this._w.querySelector('#map');if(!map||!has)return;const tile=_issTileUrl(c,_issLight(this)),kind=tile?'tiles':'vmap';this._pos={lat,lon,color:bad?'#ff4466':'#22dd88',tile};if(!map.querySelector('.'+kind)){if(kind==='tiles')_issDropVector(this);map.innerHTML=`<div class="${kind}"></div><div class="dot"></div>${_issZoomButtons}<div class="attr">${_issAttribution(c)}</div>`;_issBindZoom(this,map,()=>(this._config.tracker||{}).zoom_span,()=>{this._drawTiles();this._showZoom()});if(this._resize)this._resize.disconnect();this._resize=new ResizeObserver(()=>this._drawTiles());this._resize.observe(map)}this._drawTiles()}
  _showZoom(){const z=this._w&&this._w.querySelector('#tracker-zoom');if(z)z.textContent=String(Math.round(_issZ(this,(this._config.tracker||{}).zoom_span)))}
- _drawTiles(){const map=this._w&&this._w.querySelector('#map');if(map&&this._pos&&!this._pos.tile&&map.querySelector('.vmap')){map.querySelector('.dot')?.style.setProperty('--dc',this._pos.color);_issVector(this,map,this._pos.lat,this._pos.lon,_issZ(this,this._config.tracker.zoom_span),_issLight(this)).catch(e=>{_issDropVector(this);map.innerHTML=`<div class="map-empty">Carte indisponible : ${_gsEsc(e.message)}</div>`});return}const layer=map&&map.querySelector('.tiles');if(!layer||!this._pos)return;const W=map.offsetWidth,H=map.offsetHeight;if(!W||!H)return;const p=this._pos;layer.innerHTML=_issTilesHtml(p.lat,p.lon,Math.round(Math.min(10,_issZ(this,this._config.tracker.zoom_span))),W,H,p.tile);map.querySelector('.dot')?.style.setProperty('--dc',p.color)}
+ _drawTiles(){const map=this._w&&this._w.querySelector('#map');if(map&&this._pos&&!this._pos.tile&&map.querySelector('.vmap')){map.querySelector('.dot')?.style.setProperty('--dc',this._pos.color);_issVector(this,map,this._pos.lat,this._pos.lon,_issZ(this,this._config.tracker.zoom_span),_issLight(this)).catch(e=>{_issDropVector(this);map.innerHTML=`<div class="map-empty">Carte indisponible : ${_gsEsc(e.message)}</div>`});return}if(!map||!this._pos)return;const p=this._pos,z=Math.round(Math.min(10,_issZ(this,this._config.tracker.zoom_span)));this._iss={lat:p.lat,lon:p.lon};this._rz=z;map.querySelector('.dot')?.style.setProperty('--dc',p.color);_issRaster(this,map,p.lat,p.lon,z,p.tile,()=>this._drawTiles())}
  _updatePasses(){const c=this._config.passes||{},s=this._h.states;if(this._passLive()){_ISS.load();const msg=_issLive.problem(this._h),m=this._w.querySelector('#live-msg');if(m){m.hidden=!msg;m.textContent=msg||''}const nx=msg?null:_issLive.next(this._h,c.min_elevation!=null?Number(c.min_elevation):10,10,c.min_visible!=null?Number(c.min_visible):120),pv=this._w.querySelector('#pass-visible'),pg=this._w.querySelector('#pass-global');if(pv)pv.innerHTML=msg?'':_issLive.lines(nx&&nx.visible,_gsEsc);if(pg)pg.innerHTML=msg?'':_issLive.lines(nx&&nx.global,_gsEsc);const d=_issLive.distance(this._h),dn=this._w.querySelector('#distance-now');if(dn)dn.textContent=d===null?'—':Math.round(d).toLocaleString('fr-FR');this._history=_issLive.history(this._h,c.distance_hours||12);this._drawHistory();return}const render=(id,readId,attrId)=>{const el=this._w.querySelector('#'+id);if(!el)return;const read=s[readId],a=s[attrId]?.attributes||{};let h=`<p><strong>Début :</strong> ${_gsEsc(read?.state||'—')}</p>`;if(a.duration!=null)h+=`<p><strong>Durée :</strong> ${(parseFloat(a.duration)/60).toFixed(1)} min</p>`;if(a.maxEl!=null)h+=`<p><strong>Élévation max :</strong> ${_gsEsc(a.maxEl)}°</p>`;const path=[a.startAzCompass,a.maxAzCompass,a.endAzCompass].filter(Boolean).join(' → ');if(path)h+=`<p><strong>Trajet :</strong> ${_gsEsc(path)}</p>`;el.innerHTML=h};render('pass-visible',c.visible_readable_entity,c.visible_attrs_entity);render('pass-global',c.global_readable_entity,c.global_attrs_entity);const st=s[c.distance_entity],now=this._w.querySelector('#distance-now');if(now&&st){const n=parseFloat(st.state);now.textContent=Number.isFinite(n)?Math.round(n).toLocaleString('fr-FR'):'—'}if(c.distance_entity)this._loadHistory()}
  async _loadHistory(){const c=this._config.passes||{};if(!this._h?.connection||!c.distance_entity)return;if(Date.now()-this._historyAt<300000&&this._history)return;this._historyAt=Date.now();try{const start=new Date(Date.now()-(c.distance_hours||12)*3600000).toISOString();const r=await this._h.connection.sendMessagePromise({type:'history/history_during_period',start_time:start,entity_ids:[c.distance_entity],minimal_response:true,no_attributes:true});this._history=(r?.[c.distance_entity]||[]).map(x=>parseFloat(x.s??x.state)).filter(Number.isFinite);this._drawHistory()}catch(e){console.warn('[glossy-space-dashboard-card] history unavailable',e)}}
  _drawHistory(){const svg=this._w.querySelector('#distance-graph'),v=this._history;if(!svg||!v||v.length<2)return;const min=Math.min(...v),range=Math.max(...v)-min||1,W=300,H=55,p=v.map((n,i)=>`${(i/(v.length-1)*W).toFixed(1)},${(H-5-((n-min)/range)*(H-10)).toFixed(1)}`).join(' ');svg.innerHTML=`<polygon points="0,${H} ${p} ${W},${H}" style="fill:color-mix(in srgb,var(--g-acc) 15%,transparent)"/><polyline points="${p}" fill="none" stroke-width="2" style="stroke:var(--g-acc)"/>`}
