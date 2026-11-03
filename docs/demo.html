@@ -44,12 +44,15 @@ const cards = [
   ["glossy-iss-passes-card", { visible_readable_entity: "sensor.iss_prochain_passage_visible_lisible", visible_attrs_entity: "sensor.iss_prochain_passage_visible", global_readable_entity: "sensor.iss_prochain_passage_global_lisible", global_attrs_entity: "sensor.iss_prochain_passage_global", distance_entity: "sensor.distance_iss" }],
   ["glossy-iss-transit-card", { solar_entity: "sensor.iss_next_solar_transit", lunar_entity: "sensor.iss_next_lunar_transit" }],
 ];
+const dash = { title: "SPACE OPERATIONS", tracker: cards[0][1], passes: cards[2][1], launch: cards[1][1], transits: cards[3][1] };
+cards.unshift(["glossy-space-dashboard-card", dash]);
 for (const [type, cfg] of cards) {
   const el = document.createElement(type);
   el.setConfig(cfg);
   document.getElementById("grid").appendChild(el);
   el.hass = hass;
 }
+document.querySelector("glossy-space-dashboard-card").style.gridColumn = "1 / -1";
 </script>
 </body>
 </html>

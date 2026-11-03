@@ -2,14 +2,15 @@
  * CARTES ISS ET ESPACE — Thème HC3 Fibaro Glossy
  * https://github.com/Marlboro62/ISS
  *
- * Quatre cartes dans un seul fichier :
+ * Cinq cartes dans un seul fichier :
  *   custom:glossy-iss-tracker-card   position de l'ISS sur une mini-carte
  *   custom:glossy-iss-passes-card    prochains passages ISS + graphique de distance
  *   custom:glossy-iss-transit-card   prochains transits ISS devant le Soleil et la Lune
  *   custom:glossy-launch-card        prochain lancement (intégration Next Launch)
+ *   custom:glossy-space-dashboard-card  les quatre en un seul tableau de bord
  */
 
-const CARD_VERSION = "0.1.0-beta.1";
+const CARD_VERSION = "0.2.0-beta.1";
 
 // Enregistrement sans erreur si une ancienne copie de la carte est encore
 // chargée comme ressource à côté de celle de HACS.
@@ -94,6 +95,29 @@ const _IS_CSS = `
 const _issWorldPx = (lat, lon, z) => {
   const n = 256 * 2 ** z, la = Math.max(-85.05, Math.min(85.05, lat)) * Math.PI / 180;
   return { x: ((lon + 180) / 360) * n, y: (1 - Math.log(Math.tan(la) + 1 / Math.cos(la)) / Math.PI) / 2 * n };
+};
+// Niveau de zoom des tuiles d'après la largeur de vue voulue, en degrés.
+const _issZoom = (span) => Math.max(1, Math.min(10, Math.round(Math.log2(360 / (span || 40)))));
+// URL des tuiles : Stadia Maps prioritaire, sinon CARTO, sinon rien (OSM bloque l'usage embarqué).
+const _issTileUrl = (c) => c.stadia_api_key
+  ? `https://tiles.stadiamaps.com/tiles/alidade_smooth_dark/{z}/{x}/{y}{r}.png?api_key=${encodeURIComponent(c.stadia_api_key)}`
+  : c.carto_api_key ? `https://basemaps.cartocdn.com/rastertiles/dark-matter/{z}/{x}/{y}.png?key=${encodeURIComponent(c.carto_api_key)}` : null;
+const _issAttribution = (c) => c.stadia_api_key
+  ? '<a href="https://stadiamaps.com/" target="_blank" rel="noopener">© Stadia Maps</a> <a href="https://openmaptiles.org/" target="_blank" rel="noopener">© OpenMapTiles</a> <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap</a>'
+  : '<a href="https://carto.com/attributions" target="_blank" rel="noopener">© CARTO</a> <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap</a>';
+/** Images des tuiles couvrant W×H pixels, le point (lat, lon) au centre. */
+const _issTilesHtml = (lat, lon, z, W, H, tileUrl) => {
+  const n = 2 ** z, c = _issWorldPx(lat, lon, z);
+  const x0 = Math.floor((c.x - W / 2) / 256), x1 = Math.floor((c.x + W / 2) / 256);
+  const y0 = Math.max(0, Math.floor((c.y - H / 2) / 256)), y1 = Math.min(n - 1, Math.floor((c.y + H / 2) / 256));
+  const r = window.devicePixelRatio > 1 ? '@2x' : '';
+  let html = '';
+  for (let ty = y0; ty <= y1; ty++) for (let tx = x0; tx <= x1; tx++) {
+    const wx = ((tx % n) + n) % n; // la carte fait le tour du monde en longitude
+    const src = tileUrl.replace('{z}', z).replace('{x}', wx).replace('{y}', ty).replace('{r}', r);
+    html += `<img alt="" src="${src}" style="left:${Math.round(tx * 256 - c.x + W / 2)}px;top:${Math.round(ty * 256 - c.y + H / 2)}px">`;
+  }
+  return html;
 };
 
 class GlossyIssTrackerCard extends HTMLElement {
@@ -207,16 +231,7 @@ class GlossyIssTrackerCard extends HTMLElement {
       mapWrap.innerHTML = '<div class="map-empty">Signal perdu — pas de position disponible</div>';
       return;
     }
-    // Stadia Maps prioritaire s'il est configuré, sinon CARTO. Les serveurs
-    // de tuiles OpenStreetMap bloquent l'usage embarqué dans une appli
-    // tierce sans en-têtes d'identification appropriés (voir
-    // osm.wiki/Blocked) — pas de repli automatique dessus, une clé d'un des
-    // deux fournisseurs (gratuite) est requise pour afficher la carte.
-    const tileUrl = this._config.stadia_api_key
-      ? `https://tiles.stadiamaps.com/tiles/alidade_smooth_dark/{z}/{x}/{y}{r}.png?api_key=${encodeURIComponent(this._config.stadia_api_key)}`
-      : this._config.carto_api_key
-      ? `https://basemaps.cartocdn.com/rastertiles/dark-matter/{z}/{x}/{y}.png?key=${encodeURIComponent(this._config.carto_api_key)}`
-      : null;
+    const tileUrl = _issTileUrl(this._config);
     if (!tileUrl) {
       mapWrap.innerHTML = `<div class="map-empty"><span>Carte désactivée : configure une clé gratuite <a href="https://client.stadiamaps.com/" target="_blank" rel="noopener" style="color:#ffc06a;">Stadia Maps</a> ou <a href="https://carto.com/basemaps/apikey" target="_blank" rel="noopener" style="color:#ffc06a;">CARTO</a> dans l'éditeur de la carte.</span></div>`;
       return;
@@ -224,9 +239,7 @@ class GlossyIssTrackerCard extends HTMLElement {
 
     this._pos = { lat, lon, color: isBad ? '#ff4466' : '#22dd88', tileUrl };
     if (!mapWrap.querySelector('.tiles')) {
-      const attr = this._config.stadia_api_key
-        ? '<a href="https://stadiamaps.com/" target="_blank" rel="noopener">© Stadia Maps</a> <a href="https://openmaptiles.org/" target="_blank" rel="noopener">© OpenMapTiles</a> <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap</a>'
-        : '<a href="https://carto.com/attributions" target="_blank" rel="noopener">© CARTO</a> <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap</a>';
+      const attr = _issAttribution(this._config);
       mapWrap.innerHTML = `<div class="tiles"></div><div class="dot"></div><div class="attr">${attr}</div>`;
       // Le conteneur peut n'avoir sa vraie taille qu'un peu plus tard (onglet
       // ou section pas encore visible) : on redessine à chaque changement.
@@ -246,18 +259,7 @@ class GlossyIssTrackerCard extends HTMLElement {
     const W = mapWrap.offsetWidth, H = mapWrap.offsetHeight;
     if (!W || !H) return;
     const { lat, lon, color, tileUrl } = this._pos;
-    const z = Math.max(1, Math.min(10, Math.round(Math.log2(360 / (this._config.zoom_span || 40)))));
-    const n = 2 ** z, c = _issWorldPx(lat, lon, z);
-    const x0 = Math.floor((c.x - W / 2) / 256), x1 = Math.floor((c.x + W / 2) / 256);
-    const y0 = Math.max(0, Math.floor((c.y - H / 2) / 256)), y1 = Math.min(n - 1, Math.floor((c.y + H / 2) / 256));
-    const r = window.devicePixelRatio > 1 ? '@2x' : '';
-    let html = '';
-    for (let ty = y0; ty <= y1; ty++) for (let tx = x0; tx <= x1; tx++) {
-      const wx = ((tx % n) + n) % n; // la carte fait le tour du monde en longitude
-      const src = tileUrl.replace('{z}', z).replace('{x}', wx).replace('{y}', ty).replace('{r}', r);
-      html += `<img alt="" src="${src}" style="left:${Math.round(tx * 256 - c.x + W / 2)}px;top:${Math.round(ty * 256 - c.y + H / 2)}px">`;
-    }
-    layer.innerHTML = html;
+    layer.innerHTML = _issTilesHtml(lat, lon, _issZoom(this._config.zoom_span), W, H, tileUrl);
     mapWrap.querySelector('.dot')?.style.setProperty('--dc', color);
   }
 }
@@ -835,6 +837,7 @@ function _itCountdown(iso) {
   return `dans ${mins}m`;
 }
 
+const _issDuration = (sec) => _itFmtDuration(sec);
 function _itFmtDuration(sec) {
   const n = parseFloat(sec);
   if (isNaN(n)) return '—';
@@ -1458,11 +1461,73 @@ class GlossyLaunchCardEditor extends HTMLElement {
 }
 define('glossy-launch-card-editor', GlossyLaunchCardEditor);
 
+// ── Tableau de bord complet (les quatre cartes en une) ──────────────────
+const _GS_CSS = `
+:host{display:block;font-family:'Rajdhani','Nunito',sans-serif;color:#f2f2f2;font-size:16px;--orange:#e6750a;--amber:#ffc06a;--muted:rgba(210,180,140,.62);--ok:#22dd88;--err:#ff4466;--panel:rgba(25,25,25,.9)}
+*{box-sizing:border-box}.shell{container-type:inline-size;position:relative;overflow:hidden;padding:10px;border:1px solid rgba(230,117,10,.2);border-radius:18px;background:linear-gradient(175deg,#1e1e1e,#141414 58%,#0d0d0d);box-shadow:inset 0 1px rgba(255,255,255,.06),0 10px 32px rgba(0,0,0,.55)}
+.shell:before{content:'';position:absolute;inset:0 0 auto;height:2px;background:linear-gradient(90deg,transparent,#e6750a,transparent);opacity:.8}.top{position:relative;z-index:1;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 12px;margin-bottom:10px;border:1px solid rgba(230,117,10,.22);border-top:2px solid rgba(230,117,10,.65);border-radius:12px;background:linear-gradient(175deg,#202020,#131313)}.brand{display:flex;align-items:center;gap:10px;color:var(--amber)}.brand ha-icon{--mdc-icon-size:21px}.brand strong{font:700 13px 'Orbitron',monospace;letter-spacing:1px}.top-status{color:var(--ok);font:12px 'DM Mono',monospace}.top-status.bad{color:var(--err)}.grid{position:relative;z-index:1;display:grid;grid-template-columns:minmax(0,1.2fr) minmax(280px,.8fr);gap:10px}.left,.right{display:flex;flex-direction:column;gap:10px}.panel{position:relative;overflow:hidden;padding:15px;border:1px solid rgba(230,117,10,.2);border-radius:14px;background:linear-gradient(175deg,rgba(30,30,30,.96),rgba(15,15,15,.96));box-shadow:inset 0 1px rgba(255,255,255,.04)}.section-title{display:flex;align-items:center;gap:8px;margin-bottom:11px;padding-bottom:6px;border-bottom:1px solid rgba(230,117,10,.24);color:rgba(230,117,10,.9);font:600 11px 'Orbitron',monospace;letter-spacing:1.6px;text-transform:uppercase}.section-title:after{content:'';flex:1;height:1px;background:rgba(230,117,10,.18)}.tracker-bar{display:flex;align-items:center;gap:9px;margin-bottom:8px;color:var(--amber);font:700 12px 'Orbitron',monospace;letter-spacing:1px}.tracker-bar .coords{margin-left:auto;color:var(--ok);font:12px 'DM Mono',monospace;letter-spacing:0}.map{position:relative;width:100%;height:260px;overflow:hidden;border-radius:11px;background:#0d0d0d}.map-empty{height:100%;display:grid;place-items:center;text-align:center;padding:20px;color:var(--muted);font-size:13px}.tiles{position:absolute;inset:0}.tiles img{position:absolute;width:256px;height:256px;max-width:none;user-select:none;pointer-events:none}.dot{position:absolute;left:50%;top:50%;width:16px;height:16px;margin:-8px 0 0 -8px;border-radius:50%;background:var(--dc,#22dd88);box-shadow:0 0 0 4px color-mix(in srgb,var(--dc,#22dd88) 25%,transparent),0 0 14px var(--dc,#22dd88)}.attr{position:absolute;right:6px;bottom:4px;font-size:9px;color:rgba(210,180,140,.6);background:rgba(14,14,14,.6);padding:1px 5px;border-radius:4px}.attr a{color:inherit;text-decoration:none}@keyframes gs-blink{0%,100%{opacity:1}50%{opacity:.35}}.panel.imminent{background:rgba(255,68,102,.08);border:2px solid rgba(255,68,102,.9);box-shadow:inset 0 0 4px rgba(255,68,102,.8),inset 0 0 10px rgba(255,68,102,.35)}.panel.imminent .launch-date{color:var(--err);animation:gs-blink 1s infinite}.statline{display:flex;justify-content:space-between;gap:10px;margin-top:9px;color:var(--muted);font-size:12px}.statline b{color:#f2f2f2}.good{color:var(--ok)!important}.bad{color:var(--err)!important}.warn{color:var(--amber)!important}.pass p{margin:4px 0;color:var(--muted);font-size:13px;line-height:1.45}.pass strong{color:var(--amber)}.pass+.pass{margin-top:12px;padding-top:10px;border-top:1px solid rgba(230,117,10,.15)}.graph-now{color:#f2f2f2;font:800 20px 'Orbitron',monospace}.graph-unit{margin-left:5px;color:var(--muted);font-size:11px}.graph{width:100%;height:55px;margin-top:6px}.launch-provider{color:var(--amber);font:700 11px 'Orbitron',monospace;letter-spacing:1px;text-transform:uppercase}.launch-mission{margin-top:3px;color:#f2f2f2;font-size:18px;font-weight:700}.launch-date{margin-top:8px;color:var(--amber);font:700 13px 'Orbitron',monospace}.launch-info{margin-top:8px;color:var(--muted);font-size:12px;line-height:1.4}.launch-stats{display:flex;flex-direction:column;gap:5px;margin:10px 0;padding:9px 0;border-top:1px solid rgba(230,117,10,.14);border-bottom:1px solid rgba(230,117,10,.14);font-size:13px}.launch-stats div{display:flex;justify-content:space-between;gap:8px}.launch-desc{color:var(--muted);font-size:11px;line-height:1.35}.transit-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}.transit{padding:12px;border:1px solid rgba(230,117,10,.2);border-radius:11px;background:rgba(255,255,255,.025)}.transit h4{display:flex;align-items:center;gap:7px;margin:0 0 9px;color:var(--amber);font:700 11px 'Orbitron',monospace;letter-spacing:.7px}.transit.lunar h4{color:#8ab4ff}.transit-date{font:700 13px 'Orbitron',monospace;line-height:1.35}.transit-count{display:inline-block;margin-top:7px;padding:3px 8px;border:1px solid rgba(230,117,10,.2);border-radius:20px;color:var(--amber);font-size:11px}.metrics{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:10px}.metric{padding:7px 4px;text-align:center;border:1px solid rgba(230,117,10,.14);border-radius:8px;background:rgba(255,255,255,.03)}.metric small{display:block;color:var(--muted);font-size:9px;text-transform:uppercase}.metric b{font:700 12px 'Orbitron',monospace}.empty{padding:12px;color:var(--muted);font-size:12px;text-align:center}.footer{position:relative;z-index:1;display:flex;justify-content:space-between;gap:10px;margin-top:9px;padding:2px 4px;color:rgba(210,180,140,.42);font:10px 'DM Mono',monospace;letter-spacing:.5px}/* selon la largeur de la carte, pas de l'écran : une carte dans une colonne étroite se met sur une colonne */@container (max-width:760px){.grid{grid-template-columns:1fr}.map{height:230px}}@container (max-width:420px){.top{align-items:flex-start;flex-direction:column}.tracker-bar{flex-wrap:wrap}.tracker-bar .coords{margin-left:0;flex-basis:100%}.transit-grid{grid-template-columns:1fr}.footer{flex-direction:column}}
+`;
+
+function _gsEsc(v){return (v??'').toString().replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function _gsDate(v){const d=new Date(v);return isNaN(d.getTime())?'—':d.toLocaleString('fr-FR',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',hour12:false})}
+function _gsCountdown(v){const d=new Date(v);if(isNaN(d.getTime()))return '';let s=Math.round((d-Date.now())/1000);if(s<0)return 'passé';const day=Math.floor(s/86400);s-=day*86400;const hour=Math.floor(s/3600);s-=hour*3600;const min=Math.floor(s/60);return day?`dans ${day}j ${hour}h`:hour?`dans ${hour}h ${min}m`:`dans ${min}m`}
+const _gsDuration=_issDuration;
+
+class GlossySpaceDashboardCard extends HTMLElement{
+ constructor(){super();this.attachShadow({mode:'open'});this._ok=false;this._h=null;this._resize=null;this._history=null;this._historyAt=0}
+ setConfig(c){c=c||{};this._config={title:c.title||'SPACE OPERATIONS',tracker:{...(c.tracker||{}),lat_entity:'',lon_entity:''},passes:{...(c.passes||{})},launch:{...(c.launch||{})},transits:{...(c.transits||{})}};this._fp=null;this._history=null;if(this._ok){this._build();if(this._h)this.hass=this._h}}
+ getCardSize(){return 8}
+ static getConfigElement(){return document.createElement('glossy-space-dashboard-card-editor')}
+ static getStubConfig(){return {title:'SPACE OPERATIONS',tracker:{entity:''},passes:{},launch:{entity:''},transits:{}}}
+ set hass(h){this._h=h;if(!this._config)return;const t=this._config.tracker||{};let cleaned=false;for(const key of ['lat_entity','lon_entity']){if(t[key]&&!h.states[t[key]]){t[key]='';cleaned=true}}if(cleaned)this._config={...this._config,tracker:{...t}};if(!this._ok)this._init();const ids=this._ids();const fp=ids.map(id=>{const s=h.states[id];return id+'|'+(s?.state||'x')+'|'+JSON.stringify(s?.attributes||{})}).join('||');if(fp===this._fp)return;this._fp=fp;this._update()}
+ _ids(){const c=this._config||{};return [c.tracker.entity,c.tracker.status_entity,c.passes.visible_readable_entity,c.passes.visible_attrs_entity,c.passes.global_readable_entity,c.passes.global_attrs_entity,c.passes.distance_entity,c.launch.entity,c.launch.mission_entity,c.launch.date_entity,c.launch.probability_entity,c.launch.status_entity,c.transits.solar_entity,c.transits.lunar_entity].filter(Boolean)}
+ _init(){this._ok=true;const sh=this.shadowRoot;sh.innerHTML=`<style>${_GS_CSS}</style><div class="shell"><div class="top"><div class="brand"><ha-icon icon="mdi:satellite-variant"></ha-icon><strong id="title"></strong></div><span class="top-status" id="top-status">SYSTEM READY</span></div><div class="grid"><div class="left"><div class="panel" id="tracker-panel"></div><div class="panel" id="passes-panel"></div></div><div class="right"><div class="panel" id="launch-panel"></div><div class="panel" id="transits-panel"></div></div></div><div class="footer"><span>LIVE SPACE TELEMETRY</span><span>GLOSSY HC3 / HOME ASSISTANT</span></div></div>`;this._w=sh.querySelector('.shell');this._build();if(!this._tick)this._tick=setInterval(()=>this._h&&this._updateLaunch(),30000)}
+ _build(){if(!this._w)return;this._w.querySelector('#title').textContent=this._config.title;this._buildTracker();this._buildPasses();this._buildLaunch();this._buildTransits()}
+ _buildTracker(){const c=this._config.tracker||{};const el=this._w.querySelector('#tracker-panel');if(!c.entity){el.innerHTML='<div class="section-title">ISS TRACKER</div><div class="empty">Aucune entité tracker configurée</div>';return}el.innerHTML='<div class="tracker-bar"><ha-icon icon="mdi:satellite-variant"></ha-icon><span>ISS TRACKER</span><span class="coords" id="tracker-coords">—</span></div><div class="map" id="map"><div class="map-empty">Position en attente…</div></div><div class="statline"><span>STATUS</span><b id="tracker-status">—</b><span>ZOOM <b id="tracker-zoom">—</b></span></div>';this._pos=null}
+ _buildPasses(){const c=this._config.passes||{};const el=this._w.querySelector('#passes-panel');let html='<div class="section-title">PASSAGES ISS</div>';if(c.visible_readable_entity)html+='<div class="pass" id="pass-visible"></div>';if(c.global_readable_entity)html+='<div class="pass" id="pass-global"></div>';if(c.distance_entity)html+='<div class="pass" id="distance-box"><div><span class="graph-now" id="distance-now">—</span><span class="graph-unit">km</span></div><svg class="graph" id="distance-graph" viewBox="0 0 300 55" preserveAspectRatio="none"></svg></div>';if(!c.visible_readable_entity&&!c.global_readable_entity&&!c.distance_entity)html+='<div class="empty">Aucune donnée de passage configurée</div>';el.innerHTML=html}
+ _buildLaunch(){const c=this._config.launch||{};const el=this._w.querySelector('#launch-panel');if(!c.entity){el.innerHTML='<div class="section-title">ROCKET LAUNCH</div><div class="empty">Aucune entité de lancement configurée</div>';return}el.innerHTML='<div class="section-title">ROCKET LAUNCH</div><div class="launch-provider" id="launch-provider">—</div><div class="launch-mission" id="launch-mission">—</div><div class="launch-date" id="launch-date">—</div><div class="launch-info" id="launch-info"></div><div class="launch-stats" id="launch-stats"></div><div class="launch-desc" id="launch-desc"></div>'}
+ _buildTransits(){const c=this._config.transits||{};const el=this._w.querySelector('#transits-panel');let html='<div class="section-title">TRANSITS ISS</div><div class="transit-grid">';for(const type of ['solar','lunar']){const id=c[type+'_entity'];if(!id)continue;html+=`<div class="transit ${type}" id="transit-${type}"><h4>${type==='solar'?'☀️':'🌙'} ${type==='solar'?'TRANSIT SOLAIRE':'TRANSIT LUNAIRE'}</h4><div id="transit-body-${type}"></div></div>`}html+='</div>';if(!c.solar_entity&&!c.lunar_entity)html+='<div class="empty">Aucune entité de transit configurée</div>';el.innerHTML=html}
+ _update(){if(!this._h)return;this._updateTracker();this._updatePasses();this._updateLaunch();this._updateTransits()}
+ _updateTracker(){const c=this._config.tracker||{},s=this._h.states,main=s[c.entity],status=s[c.status_entity||c.entity],bad=!status||['unknown','unavailable'].includes(status.state);const lat0=main?.attributes?.latitude,lon0=main?.attributes?.longitude;const lat=Number(lat0),lon=Number(lon0),has=Number.isFinite(lat)&&Number.isFinite(lon)&&!(lat===0&&lon===0);const statusEl=this._w.querySelector('#tracker-status'),coordEl=this._w.querySelector('#tracker-coords');if(statusEl){statusEl.textContent=bad?'SIGNAL LOST':'SIGNAL LOCKED';statusEl.className=bad?'bad':'good'}if(coordEl)coordEl.textContent=has?`Lat: ${lat.toFixed(2)} | Lon: ${lon.toFixed(2)}`:'—';const zEl=this._w.querySelector('#tracker-zoom');if(zEl)zEl.textContent=String(_issZoom(c.zoom_span));const map=this._w.querySelector('#map');if(!map||!has)return;const tile=_issTileUrl(c);if(!tile){this._pos=null;map.innerHTML='<div class="map-empty">Carte désactivée : configure une clé Stadia Maps ou CARTO.</div>';return}this._pos={lat,lon,color:bad?'#ff4466':'#22dd88',tile};if(!map.querySelector('.tiles')){map.innerHTML=`<div class="tiles"></div><div class="dot"></div><div class="attr">${_issAttribution(c)}</div>`;if(this._resize)this._resize.disconnect();this._resize=new ResizeObserver(()=>this._drawTiles());this._resize.observe(map)}this._drawTiles()}
+ _drawTiles(){const map=this._w&&this._w.querySelector('#map'),layer=map&&map.querySelector('.tiles');if(!layer||!this._pos)return;const W=map.offsetWidth,H=map.offsetHeight;if(!W||!H)return;const p=this._pos;layer.innerHTML=_issTilesHtml(p.lat,p.lon,_issZoom(this._config.tracker.zoom_span),W,H,p.tile);map.querySelector('.dot')?.style.setProperty('--dc',p.color)}
+ _updatePasses(){const c=this._config.passes||{},s=this._h.states;const render=(id,readId,attrId)=>{const el=this._w.querySelector('#'+id);if(!el)return;const read=s[readId],a=s[attrId]?.attributes||{};let h=`<p><strong>Début :</strong> ${_gsEsc(read?.state||'—')}</p>`;if(a.duration!=null)h+=`<p><strong>Durée :</strong> ${(parseFloat(a.duration)/60).toFixed(1)} min</p>`;if(a.maxEl!=null)h+=`<p><strong>Élévation max :</strong> ${_gsEsc(a.maxEl)}°</p>`;const path=[a.startAzCompass,a.maxAzCompass,a.endAzCompass].filter(Boolean).join(' → ');if(path)h+=`<p><strong>Trajet :</strong> ${_gsEsc(path)}</p>`;el.innerHTML=h};render('pass-visible',c.visible_readable_entity,c.visible_attrs_entity);render('pass-global',c.global_readable_entity,c.global_attrs_entity);const st=s[c.distance_entity],now=this._w.querySelector('#distance-now');if(now&&st){const n=parseFloat(st.state);now.textContent=Number.isFinite(n)?Math.round(n).toLocaleString('fr-FR'):'—'}if(c.distance_entity)this._loadHistory()}
+ async _loadHistory(){const c=this._config.passes||{};if(!this._h?.connection||!c.distance_entity)return;if(Date.now()-this._historyAt<300000&&this._history)return;this._historyAt=Date.now();try{const start=new Date(Date.now()-(c.distance_hours||12)*3600000).toISOString();const r=await this._h.connection.sendMessagePromise({type:'history/history_during_period',start_time:start,entity_ids:[c.distance_entity],minimal_response:true,no_attributes:true});this._history=(r?.[c.distance_entity]||[]).map(x=>parseFloat(x.s??x.state)).filter(Number.isFinite);this._drawHistory()}catch(e){console.warn('[glossy-space-dashboard-card] history unavailable',e)}}
+ _drawHistory(){const svg=this._w.querySelector('#distance-graph'),v=this._history;if(!svg||!v||v.length<2)return;const min=Math.min(...v),range=Math.max(...v)-min||1,W=300,H=55,p=v.map((n,i)=>`${(i/(v.length-1)*W).toFixed(1)},${(H-5-((n-min)/range)*(H-10)).toFixed(1)}`).join(' ');svg.innerHTML=`<polygon points="0,${H} ${p} ${W},${H}" fill="rgba(230,117,10,.15)"/><polyline points="${p}" fill="none" stroke="#ff8c33" stroke-width="2"/>`}
+ _updateLaunch(){const c=this._config.launch||{},s=this._h.states,main=s[c.entity],mission=s[c.mission_entity],date=s[c.date_entity],proba=s[c.probability_entity],status=s[c.status_entity];const q=id=>this._w.querySelector('#'+id);if(q('launch-provider'))q('launch-provider').textContent=main?.attributes?.provider||'—';if(q('launch-mission'))q('launch-mission').textContent=mission?.state||main?.state||'—';if(q('launch-date'))q('launch-date').textContent=date?.state?_gsDate(date.state):'—';{const m=(new Date(date?.state).getTime()-Date.now())/60000;this._w.querySelector('#launch-panel')?.classList.toggle('imminent',Number.isFinite(m)&&m>0&&m<(c.imminent_minutes??15))}if(q('launch-info')){const a=main?.attributes||{};q('launch-info').innerHTML=a.pad?`📍 <b>${_gsEsc(a.pad)}</b>${a.facility?`<br><small>${_gsEsc(a.facility)}</small>`:''}`:''}if(q('launch-stats')){const a=mission?.attributes||{};q('launch-stats').innerHTML=`<div><b>Météo</b><span>${proba?.state&&!['unknown','unavailable'].includes(proba.state)?_gsEsc(proba.state)+'%':'Pas de donnée'}</span></div><div><b>Lanceur</b><span>${_gsEsc(a.rocket_name||'—')}</span></div><div><b>Orbite</b><span>${_gsEsc(a.target_orbit||'—')}</span></div>${c.status_entity?`<div class="${/go/i.test(status?.state||'')?'good':'warn'}"><b>Statut</b><b>${_gsEsc(status?.state||'—')}</b></div>`:''}`}if(q('launch-desc'))q('launch-desc').textContent=mission?.attributes?.description||''}
+ _updateTransits(){const c=this._config.transits||{},s=this._h.states;for(const type of ['solar','lunar']){const body=this._w.querySelector('#transit-body-'+type),st=s[c[type+'_entity']];if(!body||!st)continue;const a=st.attributes||{},date=a.date;if(!date){body.innerHTML=`<div class="empty">Aucun transit prévu dans l'année.${a.closest_approach_deg!=null?`<br>Approche : <b>${Number(a.closest_approach_deg).toFixed(1)}°</b>`:''}</div>`;continue}body.innerHTML=`<div class="transit-date">${_gsEsc(_gsDate(date))}</div><span class="transit-count">${_gsEsc(_gsCountdown(date))}</span><div class="metrics"><div class="metric"><small>Durée</small><b>${_gsDuration(a.duration_seconds)}</b></div><div class="metric"><small>Élévation</small><b>${a.max_elevation_deg!=null?Number(a.max_elevation_deg).toFixed(1)+'°':'—'}</b></div>${type==='lunar'?`<div class="metric" style="grid-column:1/-1"><small>Distance ISS</small><b>${a.iss_distance_km!=null?Math.round(a.iss_distance_km).toLocaleString('fr-FR')+' km':'—'}</b></div>`:''}</div>`}}
+ connectedCallback(){if(this._ok&&!this._tick)this._tick=setInterval(()=>this._h&&this._updateLaunch(),30000)}
+ disconnectedCallback(){if(this._resize){this._resize.disconnect();this._resize=null}clearInterval(this._tick);this._tick=null}
+}
+define('glossy-space-dashboard-card', GlossySpaceDashboardCard);
+
+class GlossySpaceDashboardCardEditor extends HTMLElement{
+ setConfig(config){const c=config||{};this._config={type:'custom:glossy-space-dashboard-card',title:c.title||'SPACE OPERATIONS',tracker:{...(c.tracker||{}),lat_entity:'',lon_entity:''},passes:{...(c.passes||{})},launch:{...(c.launch||{})},transits:{...(c.transits||{})}};if(this._hass&&!this._built)this._render()}
+ set hass(hass){this._hass=hass;if(!this._built)this._render();else this._syncPickers()}
+ connectedCallback(){if(this._config)this._render()}
+ _emit(){this._config={...this._config,type:'custom:glossy-space-dashboard-card'};this.dispatchEvent(new CustomEvent('config-changed',{detail:{config:this._config},bubbles:true,composed:true}))}
+ _esc(v){return (v??'').toString().replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+ _render(){if(!this._config||!this._hass)return;if(!this.shadowRoot)this.attachShadow({mode:'open'});const c=this._config,t=c.tracker||{},p=c.passes||{},l=c.launch||{},x=c.transits||{};this.shadowRoot.innerHTML=`<style>
+  .wrap{padding:4px 0;font-family:var(--paper-font-body1_-_font-family,Arial,sans-serif)}.group{margin:16px 0 20px;padding:12px;border:1px solid var(--divider-color,#555);border-radius:10px}.group h3{margin:0 0 12px;font-size:13px;color:var(--primary-text-color,#eee)}.field{margin:0 0 11px}.field:last-child{margin-bottom:0}label{display:block;margin:0 0 4px;font-size:12px;color:var(--secondary-text-color,#999)}input{width:100%;box-sizing:border-box;padding:8px;border:1px solid var(--divider-color,#555);border-radius:6px;background:var(--card-background-color,#1c1c1c);color:var(--primary-text-color,#eee)}.hint{font-size:11px;line-height:1.4;color:var(--secondary-text-color,#888);margin-top:-4px;margin-bottom:12px}
+ </style><div class="wrap"><div class="field"><label>Titre du dashboard</label><input id="title" value="${this._esc(c.title)}"></div>
+ <div class="group"><h3>ISS Tracker</h3><div class="field"><label>Entité position (latitude / longitude)</label><ha-entity-picker id="tracker.entity"></ha-entity-picker></div><div class="field"><label>Entité statut</label><ha-entity-picker id="tracker.status_entity"></ha-entity-picker></div><div class="field"><label>Largeur de vue carte (degrés)</label><input id="tracker.zoom_span" type="number" value="${this._esc(t.zoom_span??40)}"></div><div class="field"><label>Clé Stadia Maps (optionnelle)</label><input id="tracker.stadia_api_key" type="text" value="${this._esc(t.stadia_api_key||'')}"></div><div class="field"><label>Clé CARTO (optionnelle)</label><input id="tracker.carto_api_key" type="text" value="${this._esc(t.carto_api_key||'')}"></div><div class="hint">Une clé cartographique est nécessaire pour afficher les tuiles. Les contrôles +/− et l’attribution restent masqués dans la card.</div></div>
+ <div class="group"><h3>Passages ISS</h3><div class="field"><label>Passage visible — texte</label><ha-entity-picker id="passes.visible_readable_entity"></ha-entity-picker></div><div class="field"><label>Passage visible — attributs</label><ha-entity-picker id="passes.visible_attrs_entity"></ha-entity-picker></div><div class="field"><label>Passage global — texte</label><ha-entity-picker id="passes.global_readable_entity"></ha-entity-picker></div><div class="field"><label>Passage global — attributs</label><ha-entity-picker id="passes.global_attrs_entity"></ha-entity-picker></div><div class="field"><label>Distance ISS</label><ha-entity-picker id="passes.distance_entity"></ha-entity-picker></div><div class="field"><label>Historique distance (heures)</label><input id="passes.distance_hours" type="number" value="${this._esc(p.distance_hours??12)}"></div></div>
+ <div class="group"><h3>Prochain lancement</h3><div class="field"><label>Entité principale</label><ha-entity-picker id="launch.entity"></ha-entity-picker></div><div class="field"><label>Mission</label><ha-entity-picker id="launch.mission_entity"></ha-entity-picker></div><div class="field"><label>Date de lancement</label><ha-entity-picker id="launch.date_entity"></ha-entity-picker></div><div class="field"><label>Probabilité météo</label><ha-entity-picker id="launch.probability_entity"></ha-entity-picker></div><div class="field"><label>Statut du lancement</label><ha-entity-picker id="launch.status_entity"></ha-entity-picker></div><div class="field"><label>Seuil imminent (minutes)</label><input id="launch.imminent_minutes" type="number" value="${this._esc(l.imminent_minutes??15)}"></div></div>
+ <div class="group"><h3>Transits ISS</h3><div class="field"><label>Transit solaire</label><ha-entity-picker id="transits.solar_entity"></ha-entity-picker></div><div class="field"><label>Transit lunaire</label><ha-entity-picker id="transits.lunar_entity"></ha-entity-picker></div></div></div>`;
+ const paths=['tracker.entity','tracker.status_entity','passes.visible_readable_entity','passes.visible_attrs_entity','passes.global_readable_entity','passes.global_attrs_entity','passes.distance_entity','launch.entity','launch.mission_entity','launch.date_entity','launch.probability_entity','launch.status_entity','transits.solar_entity','transits.lunar_entity'];
+ const get=(path)=>path.split('.').reduce((o,k)=>o?.[k],this._config)||'';const set=(path,value)=>{const [section,key]=path.split('.');this._config={...this._config,[section]:{...(this._config[section]||{}),[key]:value}};this._emit()};
+ paths.forEach(path=>{const picker=this.shadowRoot.getElementById(path);if(!picker)return;picker.hass=this._hass;picker.includeDomains=['sensor'];picker.value=get(path);picker.addEventListener('value-changed',e=>{e.stopPropagation();set(path,e.detail.value)})});
+ const bind=(id,path,number=false)=>{const el=this.shadowRoot.getElementById(id);if(!el)return;el.addEventListener('input',e=>{const value=number?(parseFloat(e.target.value)||0):e.target.value;if(path==='title')this._config={...this._config,title:value};else{const [section,key]=path.split('.');this._config={...this._config,[section]:{...(this._config[section]||{}),[key]:value}}}this._emit()})};bind('title','title');bind('tracker.zoom_span','tracker.zoom_span',true);bind('tracker.stadia_api_key','tracker.stadia_api_key');bind('tracker.carto_api_key','tracker.carto_api_key');bind('passes.distance_hours','passes.distance_hours',true);bind('launch.imminent_minutes','launch.imminent_minutes',true);this._built=true
+ }
+ _syncPickers(){if(!this.shadowRoot)return;this.shadowRoot.querySelectorAll('ha-entity-picker').forEach(p=>{p.hass=this._hass})}
+}
+define('glossy-space-dashboard-card-editor', GlossySpaceDashboardCardEditor);
+
 window.customCards = window.customCards || [];
 for (const card of [
   { type: 'glossy-iss-tracker-card', name: 'Glossy ISS Tracker Card', description: "Position de l'ISS en direct avec petite carte · HC3 Fibaro" },
   { type: 'glossy-iss-passes-card', name: 'Glossy ISS Passes Card', description: 'Prochains passages ISS (visible/global) + graphique de distance · HC3 Fibaro' },
   { type: 'glossy-iss-transit-card', name: 'Glossy ISS Transit Card', description: 'Prochains transits ISS devant le Soleil et la Lune · HC3 Fibaro' },
+  { type: 'glossy-space-dashboard-card', name: 'Glossy Space Dashboard Card', description: 'Tableau de bord complet : ISS, passages, lancement et transits · HC3 Fibaro' },
   { type: 'glossy-launch-card', name: 'Glossy Launch Card', description: 'Prochain lancement (Next Launch) : mission, compte à rebours, pad, météo, statut · HC3 Fibaro' },
 ]) if (!window.customCards.some((c) => c.type === card.type)) window.customCards.push({ ...card, preview: true });
 
