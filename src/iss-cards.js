@@ -10,7 +10,7 @@
  *   custom:iss-space-dashboard-card  les quatre en un seul tableau de bord
  */
 
-const CARD_VERSION = "1.1.1-beta.1";
+const CARD_VERSION = "1.1.1";
 
 // Enregistrement sans erreur si une ancienne copie de la carte est encore
 // chargée comme ressource à côté de celle de HACS.
