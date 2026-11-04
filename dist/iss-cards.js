@@ -10,7 +10,7 @@
  *   custom:iss-space-dashboard-card  les quatre en un seul tableau de bord
  */
 
-const CARD_VERSION = "1.1.0";
+const CARD_VERSION = "1.1.1-beta.1";
 
 // Enregistrement sans erreur si une ancienne copie de la carte est encore
 // chargée comme ressource à côté de celle de HACS.
@@ -592,7 +592,10 @@ window.issCards = window.issCards || {
 };
 
 // ── Mise en forme française : nombres à virgule, coordonnées, points cardinaux (O pour ouest) ──
-const _issNum = (v, d = 1) => { const n = Number(v); return Number.isFinite(n) ? n.toLocaleString('fr-FR', { minimumFractionDigits: d, maximumFractionDigits: d }) : String(v ?? '—'); };
+/** Échappe une valeur avant de l'insérer dans du HTML (texte ou attribut). */
+const _issEsc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+/** Nombre formaté en français ; « — » si la valeur n'est pas un nombre (jamais la valeur brute). */
+const _issNum = (v, d = 1) => { const n = Number(v); return Number.isFinite(n) ? n.toLocaleString('fr-FR', { minimumFractionDigits: d, maximumFractionDigits: d }) : '—'; };
 const _issCoords = (lat, lon) => `Lat. ${_issNum(Math.abs(lat), 2)}° ${lat >= 0 ? 'N' : 'S'} · Long. ${_issNum(Math.abs(lon), 2)}° ${lon >= 0 ? 'E' : 'O'}`;
 /** Points cardinaux en français : W (ouest) devient O, dans « WSW → NNW » comme dans « SW ». */
 const _issCardFr = (t) => String(t ?? '').replace(/\b[NSEW]{1,3}\b/g, (m) => m.replace(/W/g, 'O'));
@@ -1072,7 +1075,7 @@ class IssTrackerCardEditor extends HTMLElement {
     this.dispatchEvent(new CustomEvent('config-changed', { detail: { config: this._config } }));
   }
 
-  _esc(s) { return (s || '').toString().replace(/"/g, '&quot;'); }
+  _esc(s) { return _issEsc(s); }
 
   _render() {
     if (!this._config) return;
@@ -1107,7 +1110,7 @@ class IssTrackerCardEditor extends HTMLElement {
         <div class="hint">Laisser vide utilise l'entité position elle-même pour déterminer si le signal est perdu.</div>
         <div class="field"><label>Latitude de repli (facultatif)</label><ha-entity-picker id="lat_entity"></ha-entity-picker></div>
         <div class="field"><label>Longitude de repli (facultatif)</label><ha-entity-picker id="lon_entity"></ha-entity-picker></div>
-        <div class="field"><label>Largeur de la vue carte (degrés)</label><input id="zoom_span" type="number" value="${cfg.zoom_span}"></div>
+        <div class="field"><label>Largeur de la vue carte (degrés)</label><input id="zoom_span" type="number" value="${this._esc(cfg.zoom_span)}"></div>
         <div class="field"><label>Clé API Stadia Maps (facultative, prioritaire si les deux sont remplies)</label><input id="stadia_api_key" type="text" value="${this._esc(cfg.stadia_api_key)}" placeholder="client.stadiamaps.com"></div>
         <div class="field"><label>Clé API CARTO Basemaps (facultative)</label><input id="carto_api_key" type="text" value="${this._esc(cfg.carto_api_key)}" placeholder="carto.com/basemaps/apikey"></div>
         <div class="hint">Sans clé, la carte utilise le fond vectoriel OpenFreeMap, gratuit et sans clé. Une clé Stadia Maps ou CARTO, gratuite, donne leurs propres fonds. Les clés restent dans ta configuration, jamais dans le fichier partagé.</div>
@@ -1466,7 +1469,7 @@ class IssPassesCardEditor extends HTMLElement {
     this.dispatchEvent(new CustomEvent('config-changed', { detail: { config: this._config } }));
   }
 
-  _esc(s) { return (s || '').toString().replace(/"/g, '&quot;'); }
+  _esc(s) { return _issEsc(s); }
 
   _render() {
     if (!this._config) return;
@@ -1511,7 +1514,7 @@ class IssPassesCardEditor extends HTMLElement {
         <h4>Distance de l’ISS (facultatif)</h4>
         <div class="hint">Laisser vide masque le graphique.</div>
         <div class="field"><label>Entité distance</label><ha-entity-picker id="distance_entity"></ha-entity-picker></div>
-        <div class="field"><label>Fenêtre d'historique (heures)</label><input id="distance_hours" type="number" value="${cfg.distance_hours}"></div>
+        <div class="field"><label>Fenêtre d'historique (heures)</label><input id="distance_hours" type="number" value="${this._esc(cfg.distance_hours)}"></div>
       </div>
     `;
 
@@ -1868,7 +1871,7 @@ class IssTransitCardEditor extends HTMLElement {
     this.dispatchEvent(new CustomEvent('config-changed', { detail: { config: this._config } }));
   }
 
-  _esc(s) { return (s || '').toString().replace(/"/g, '&quot;'); }
+  _esc(s) { return _issEsc(s); }
 
   _render() {
     if (!this._config) return;
@@ -2213,7 +2216,7 @@ class IssLaunchCardEditor extends HTMLElement {
     this.dispatchEvent(new CustomEvent('config-changed', { detail: { config: this._config } }));
   }
 
-  _esc(s) { return (s || '').toString().replace(/"/g, '&quot;'); }
+  _esc(s) { return _issEsc(s); }
 
   _render() {
     if (!this._config) return;
@@ -2248,7 +2251,7 @@ class IssLaunchCardEditor extends HTMLElement {
         <div class="field"><label>Entité date de lancement</label><ha-entity-picker id="date_entity"></ha-entity-picker></div>
         <div class="field"><label>Entité probabilité météo (facultatif)</label><ha-entity-picker id="probability_entity"></ha-entity-picker></div>
         <div class="field"><label>Entité statut (facultatif)</label><ha-entity-picker id="status_entity"></ha-entity-picker></div>
-        <div class="field"><label>Seuil "imminent" (minutes)</label><input id="imminent_minutes" type="number" value="${cfg.imminent_minutes}"></div>
+        <div class="field"><label>Seuil "imminent" (minutes)</label><input id="imminent_minutes" type="number" value="${this._esc(cfg.imminent_minutes)}"></div>
         <div class="hint">Sous ce seuil avant le décollage, la carte passe en bordure rouge clignotante.</div>
       </div>
     `;
