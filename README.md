@@ -28,6 +28,9 @@
 
 # Cartes ISS et espace
 
+[![HACS Default](https://img.shields.io/badge/HACS-Default-41BDF5.svg)](https://hacs.xyz/)
+[![Release](https://img.shields.io/github/v/release/Marlboro62/ISS)](https://github.com/Marlboro62/ISS/releases)
+
 **Cinq cartes Lovelace dans un seul fichier**, aux couleurs des autres cartes ([Météo](https://github.com/Marlboro62/meteo-card), [Carte Enedis Linky New](https://github.com/Marlboro62/content-card-linky-new)…) : bleu nuit par défaut, version claire, ou thème Home Assistant :
 
 | Type | Carte |
