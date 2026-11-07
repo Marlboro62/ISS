@@ -88,7 +88,7 @@ Si la carte n'apparaît pas encore dans la recherche de HACS, ajoutez le dépôt
 
 ### Manuellement
 
-1. Téléchargez [`iss-cards.js`](https://raw.githubusercontent.com/Marlboro62/ISS/main/dist/iss-cards.js) et [`iss-cards-maps.js`](https://raw.githubusercontent.com/Marlboro62/ISS/main/dist/iss-cards-maps.js) (clic droit → Enregistrer sous) et copiez-les **tous les deux** dans `/config/www/` : le second contient MapLibre GL, chargé par la mini-carte.
+1. Téléchargez [`iss-cards.js`](https://raw.githubusercontent.com/Marlboro62/ISS/main/dist/iss-cards.js), [`iss-cards-maps.js`](https://raw.githubusercontent.com/Marlboro62/ISS/main/dist/iss-cards-maps.js) et [`iss-cards-maps-worker.js`](https://raw.githubusercontent.com/Marlboro62/ISS/main/dist/iss-cards-maps-worker.js) (clic droit → Enregistrer sous) et copiez-les **tous les trois** dans `/config/www/` : les deux derniers contiennent MapLibre GL, chargé par la mini-carte. Sans WebGL (accélération matérielle coupée), la mini-carte affiche des images OpenStreetMap.
 2. **Paramètres → Tableaux de bord → ⋮ → Ressources → Ajouter une ressource** : URL `/local/iss-cards.js`, type **Module JavaScript**.
 3. Rechargez la page (Ctrl+F5).
 
